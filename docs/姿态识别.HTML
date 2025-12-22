@@ -352,6 +352,168 @@
         }
         
         .error-msg { color: var(--danger); font-weight: bold; margin-top: 10px; font-size: 0.9rem; }
+
+        /* Camera Selector */
+        #camera-select {
+            appearance: none;
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.95);
+            border: none;
+            padding: 8px 32px 8px 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+            cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234318ff' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            min-width: 180px;
+        }
+        #camera-select:focus { outline: 2px solid var(--accent-primary); }
+        #camera-select option { padding: 8px; }
+
+        /* Microphone Selector */
+        #mic-select {
+            appearance: none;
+            -webkit-appearance: none;
+            background: rgba(255,255,255,0.95);
+            border: none;
+            padding: 6px 28px 6px 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--accent-secondary);
+            cursor: pointer;
+            border-radius: 6px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2300d9ff' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        #mic-select:focus { outline: 2px solid var(--accent-secondary); }
+
+        /* ASR Config */
+        .asr-config {
+            background: #f8f9fc;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .asr-config.show { display: block; }
+        .asr-config-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .asr-config-row:last-child { margin-bottom: 0; }
+        .asr-config input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid #e0e5f2;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--text-primary);
+        }
+        .asr-config input:focus {
+            outline: none;
+            border-color: var(--accent-secondary);
+        }
+        .asr-config input::placeholder {
+            color: var(--text-secondary);
+        }
+        .asr-config-toggle {
+            background: none;
+            border: none;
+            color: var(--accent-secondary);
+            font-size: 0.7rem;
+            cursor: pointer;
+            padding: 0;
+            margin-bottom: 8px;
+        }
+        .asr-config-toggle:hover { text-decoration: underline; }
+
+        /* ASR Panel */
+        .asr-card {
+            background: var(--panel-bg);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: var(--shadow-card);
+            border-left: 4px solid var(--accent-secondary);
+            margin-top: 8px;
+        }
+        .asr-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .asr-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .asr-status {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: #f4f7fe;
+        }
+        .asr-status.idle { color: var(--text-secondary); }
+        .asr-status.listening { color: var(--success); background: #e6fff5; }
+        .asr-status.error { color: var(--danger); background: #fef2f2; }
+        .asr-status.unsupported { color: var(--warning); background: #fff8e6; }
+
+        .asr-transcript {
+            background: #f8f9fc;
+            border-radius: 12px;
+            padding: 12px;
+            min-height: 80px;
+            max-height: 120px;
+            overflow-y: auto;
+            font-family: var(--font-cn);
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+        .asr-transcript .interim {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        .asr-transcript .final {
+            color: var(--text-primary);
+        }
+        .asr-unsupported-msg {
+            color: var(--warning);
+            font-size: 0.8rem;
+            text-align: center;
+            padding: 20px 10px;
+        }
+
+        /* Report Voice Section */
+        .report-voice-section {
+            grid-column: 1 / -1;
+            background: #f8f9fc;
+            border-radius: 16px;
+            padding: 15px;
+            border-left: 5px solid var(--accent-secondary);
+        }
+        .report-voice-section h4 {
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .voice-log {
+            font-size: 0.8rem;
+            color: #666;
+            font-family: var(--font-cn);
+            max-height: 100px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
@@ -362,7 +524,9 @@
             <video id="input-video" playsinline></video>
             <canvas id="output-canvas"></canvas>
             
-            <div class="viewport-badge badge-tl">FULL-BODY SCAN (STABLE)</div>
+            <select id="camera-select" class="viewport-badge badge-tl">
+                <option value="">选择摄像头...</option>
+            </select>
             <div class="viewport-badge badge-tr">● LIVE</div>
             <div class="viewport-badge badge-bl">FPS: <span id="fps-counter">0</span></div>
             
@@ -437,6 +601,27 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ASR Panel -->
+            <div class="asr-card" id="asr-card">
+                <div class="asr-header">
+                    <span class="asr-label">VOICE MONITOR 语音监控</span>
+                    <span class="asr-status idle" id="asr-status">● IDLE</span>
+                </div>
+
+                <!-- Microphone Info -->
+                <select id="mic-select" title="显示系统麦克风列表（Web Speech API使用系统默认麦克风）">
+                    <option value="">系统麦克风列表...</option>
+                </select>
+                <div style="font-size: 0.65rem; color: var(--text-secondary); margin-bottom: 8px;">
+                    * 使用浏览器语音识别，如需切换麦克风请在系统设置中更改默认设备
+                </div>
+
+                <div class="asr-transcript" id="asr-transcript">
+                    <span class="interim" id="asr-interim"></span>
+                    <span class="final" id="asr-final">等待开始训练...</span>
+                </div>
+            </div>
         </section>
     </div>
 
@@ -478,6 +663,12 @@
             <div class="diagnosis-item" id="diag-knee"></div>
             <div class="diagnosis-item" id="diag-ankle"></div>
 
+            <!-- Voice Log Section -->
+            <div class="report-voice-section" id="report-voice-section">
+                <h4>VOICE LOG 语音记录</h4>
+                <div class="voice-log" id="report-voice-log">暂无语音记录</div>
+            </div>
+
             <button class="btn-restart" onclick="location.reload()">START NEW SESSION</button>
         </div>
     </div>
@@ -511,6 +702,16 @@
             frames: 0,
             spineErrors: 0, shoulderErrors: 0, armErrors: 0, wristErrors: 0, kneeErrors: 0, ankleErrors: 0
         };
+
+        // Camera Selection
+        let currentDeviceId = null;
+        const cameraSelect = document.getElementById('camera-select');
+
+        // Microphone Selection (display only, Web Speech API uses system default)
+        const micSelect = document.getElementById('mic-select');
+
+        // ASR Transcript
+        let asrTranscript = []; // Store recognized text with timestamps
 
         const SOP_RULES = {
             greeting: { spine: [170, 180], shoulder: [0, 8], arm: [160, 180], wrist: [150, 180], knee: [170, 180], ankle: [120, 180], name: "Standard Greeting" },
@@ -547,10 +748,237 @@
         }
         createPoseLandmarker();
 
+        // --- Camera Enumeration ---
+        async function enumerateVideoDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                return devices.filter(device => device.kind === 'videoinput');
+            } catch (err) {
+                console.error('Failed to enumerate devices:', err);
+                return [];
+            }
+        }
+
+        async function populateCameraSelect() {
+            const cameras = await enumerateVideoDevices();
+            cameraSelect.innerHTML = cameras.length > 0
+                ? cameras.map((cam, i) =>
+                    `<option value="${cam.deviceId}">${cam.label || '摄像头 ' + (i + 1)}</option>`
+                  ).join('')
+                : '<option value="">未找到摄像头</option>';
+
+            // Select first camera by default
+            if (cameras.length > 0) {
+                currentDeviceId = cameras[0].deviceId;
+            }
+        }
+
+        // Initial camera enumeration (may need permission first)
+        populateCameraSelect();
+
+        // Handle device changes (plug/unplug)
+        navigator.mediaDevices.addEventListener('devicechange', populateCameraSelect);
+
+        // Handle camera selection change during runtime
+        cameraSelect.addEventListener('change', async (e) => {
+            if (!isRunning) return; // Only switch if running
+
+            const newDeviceId = e.target.value;
+            if (newDeviceId && newDeviceId !== currentDeviceId) {
+                try {
+                    // Stop current stream
+                    if (video.srcObject) {
+                        video.srcObject.getTracks().forEach(track => track.stop());
+                    }
+
+                    // Get new stream
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { deviceId: { exact: newDeviceId }, width: 1280, height: 720 },
+                        audio: false
+                    });
+
+                    video.srcObject = stream;
+                    currentDeviceId = newDeviceId;
+                    console.log('Switched to camera:', newDeviceId);
+                } catch (err) {
+                    console.error('Failed to switch camera:', err);
+                    alert('切换摄像头失败: ' + err.message);
+                }
+            }
+        });
+
+        // --- Microphone Enumeration ---
+        async function enumerateAudioDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                return devices.filter(device => device.kind === 'audioinput');
+            } catch (err) {
+                console.error('Failed to enumerate audio devices:', err);
+                return [];
+            }
+        }
+
+        async function populateMicSelect() {
+            const mics = await enumerateAudioDevices();
+            micSelect.innerHTML = mics.length > 0
+                ? mics.map((mic, i) =>
+                    `<option value="${mic.deviceId}">${mic.label || '麦克风 ' + (i + 1)}</option>`
+                  ).join('')
+                : '<option value="">未找到麦克风</option>';
+        }
+
+        // Initial mic enumeration
+        populateMicSelect();
+
+        // --- Web Speech API ASR ---
+        let recognition = null;
+        let asrSupported = false;
+        let lastInterimText = ''; // Store last interim for backup saving
+
+        function initASR() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!SpeechRecognition) {
+                console.warn('Web Speech API not supported');
+                document.getElementById('asr-status').textContent = '● 不支持';
+                document.getElementById('asr-status').className = 'asr-status unsupported';
+                document.getElementById('asr-transcript').innerHTML =
+                    '<div class="asr-unsupported-msg">当前浏览器不支持语音识别<br>请使用 Chrome 或 Edge</div>';
+                return false;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'zh-CN';
+            recognition.maxAlternatives = 1;
+
+            recognition.onresult = (event) => {
+                let interimText = '';
+                let finalText = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    const text = result[0].transcript.trim();
+
+                    if (result.isFinal) {
+                        if (text) {
+                            finalText += text + ' ';
+                            asrTranscript.push({
+                                text: text,
+                                timestamp: Date.now(),
+                                confidence: result[0].confidence
+                            });
+                            lastInterimText = ''; // Clear interim after final
+                            console.log('ASR Final:', text, 'Total saved:', asrTranscript.length);
+                        }
+                    } else {
+                        interimText += result[0].transcript;
+                        lastInterimText = interimText; // Save interim for backup
+                    }
+                }
+
+                updateASRDisplay(interimText, finalText);
+            };
+
+            recognition.onerror = (event) => {
+                console.error('ASR Error:', event.error);
+                if (event.error === 'not-allowed') {
+                    updateASRStatus('error', '麦克风权限被拒绝');
+                } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                    updateASRStatus('error', '识别错误');
+                }
+            };
+
+            recognition.onend = () => {
+                // Save any remaining interim text before restarting
+                if (lastInterimText.trim() && isRunning) {
+                    asrTranscript.push({
+                        text: lastInterimText.trim(),
+                        timestamp: Date.now(),
+                        confidence: 0.5 // Mark as interim
+                    });
+                    console.log('ASR Interim saved on end:', lastInterimText);
+                    lastInterimText = '';
+                }
+
+                // Auto-restart if system is still running
+                if (isRunning && recognition) {
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        // Ignore if already started
+                    }
+                }
+            };
+
+            asrSupported = true;
+            return true;
+        }
+
+        // Initialize ASR
+        initASR();
+
+        function startASR() {
+            if (!recognition) {
+                updateASRStatus('unsupported', '不支持');
+                return;
+            }
+            try {
+                lastInterimText = '';
+                recognition.start();
+                updateASRStatus('listening', '正在听...');
+                document.getElementById('asr-final').textContent = '';
+                console.log('ASR started (Web Speech API)');
+            } catch (e) {
+                console.error('Failed to start ASR:', e);
+            }
+        }
+
+        function stopASR() {
+            if (!recognition) return;
+            try {
+                // Save any remaining interim text before stopping
+                if (lastInterimText.trim()) {
+                    asrTranscript.push({
+                        text: lastInterimText.trim(),
+                        timestamp: Date.now(),
+                        confidence: 0.5
+                    });
+                    console.log('ASR Interim saved on stop:', lastInterimText);
+                    lastInterimText = '';
+                }
+
+                recognition.stop();
+                updateASRStatus('idle', 'IDLE');
+                console.log('ASR stopped, total saved:', asrTranscript.length);
+            } catch (e) {
+                // Ignore
+            }
+        }
+
+        function updateASRStatus(status, text) {
+            const el = document.getElementById('asr-status');
+            el.className = 'asr-status ' + status;
+            el.textContent = '● ' + text;
+        }
+
+        function updateASRDisplay(interim, final) {
+            const interimEl = document.getElementById('asr-interim');
+            const finalEl = document.getElementById('asr-final');
+
+            if (final) {
+                finalEl.textContent += final;
+                const transcriptEl = document.getElementById('asr-transcript');
+                transcriptEl.scrollTop = transcriptEl.scrollHeight;
+            }
+            interimEl.textContent = interim;
+        }
+
         // --- 2. System Logic ---
         window.toggleSystem = async () => {
             const btn = document.getElementById('toggle-btn');
-            
+
             if (!isRunning) {
                 if (!poseLandmarker) {
                     alert("AI Model is still loading...");
@@ -564,11 +992,21 @@
                 document.getElementById('loader-text').innerText = "STARTING CAMERA...";
 
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { width: 1280, height: 720, facingMode: 'user' } 
+                    // Use selected camera or default
+                    const selectedDeviceId = cameraSelect.value || currentDeviceId;
+                    const videoConstraints = selectedDeviceId
+                        ? { deviceId: { exact: selectedDeviceId }, width: 1280, height: 720 }
+                        : { width: 1280, height: 720, facingMode: 'user' };
+
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: videoConstraints,
+                        audio: false  // Audio handled separately by ASR
                     });
                     video.srcObject = stream;
-                    
+
+                    // Update camera select with device labels after permission granted
+                    populateCameraSelect();
+
                     video.onloadedmetadata = () => {
                         video.play();
                         canvas.width = video.videoWidth;
@@ -576,6 +1014,11 @@
                         isRunning = true;
                         loader.style.display = 'none';
                         prevLandmarks = []; // Reset history
+                        asrTranscript = []; // Reset ASR transcript
+
+                        // Start ASR
+                        startASR();
+
                         predictWebcam();
                     };
 
@@ -589,6 +1032,10 @@
             } else {
                 isRunning = false;
                 cancelAnimationFrame(animationId);
+
+                // Stop ASR
+                stopASR();
+
                 if(video.srcObject) {
                     video.srcObject.getTracks().forEach(track => track.stop());
                 }
@@ -814,11 +1261,11 @@
         // --- 7. Report Generation ---
         function generateReport() {
             document.getElementById('report-overlay').style.display = 'flex';
-            
+
             const totalChecks = sessionStats.frames * 6;
             const totalErrors = sessionStats.spineErrors + sessionStats.shoulderErrors + sessionStats.armErrors + sessionStats.wristErrors + sessionStats.kneeErrors + sessionStats.ankleErrors;
             const finalScore = totalChecks > 0 ? Math.round(((totalChecks - totalErrors)/totalChecks)*100) : 0;
-            
+
             document.getElementById('report-score').innerText = finalScore;
 
             createReportItem('diag-spine', 'Head & Spine', sessionStats.spineErrors, "脊柱垂直度");
@@ -827,6 +1274,34 @@
             createReportItem('diag-wrist', 'Wrist Posture', sessionStats.wristErrors, "手腕姿态");
             createReportItem('diag-knee', 'Lower Body (Knees)', sessionStats.kneeErrors, "膝盖协同");
             createReportItem('diag-ankle', 'Ankle Stability', sessionStats.ankleErrors, "脚踝/站姿");
+
+            // Generate voice log
+            generateVoiceLog();
+        }
+
+        function generateVoiceLog() {
+            const voiceLogEl = document.getElementById('report-voice-log');
+
+            console.log('Generating voice log, asrTranscript:', asrTranscript);
+
+            if (!asrTranscript || asrTranscript.length === 0) {
+                voiceLogEl.textContent = '本次训练未检测到语音内容';
+                return;
+            }
+
+            // Format transcript with timestamps
+            const logHtml = asrTranscript.map((item, index) => {
+                const time = new Date(item.timestamp);
+                const timeStr = time.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const confidence = item.confidence ? Math.round(item.confidence * 100) + '%' : '';
+                return `<div style="margin-bottom: 6px;">
+                    <span style="color: var(--accent-secondary); font-size: 0.75rem;">[${timeStr}]</span>
+                    ${item.text}
+                    ${confidence ? `<span style="color: var(--text-secondary); font-size: 0.7rem;"> (${confidence})</span>` : ''}
+                </div>`;
+            }).join('');
+
+            voiceLogEl.innerHTML = logHtml;
         }
 
         function createReportItem(id, title, errors, labelCN) {
