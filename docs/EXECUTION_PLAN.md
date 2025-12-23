@@ -136,25 +136,40 @@ class VideoSource(ABC):
 - [ ] 实现 `PoseAnalyzer` 姿态分析器
 - [ ] 编写单元测试
 
+#### 防冲击姿势检测（Brace Position）
+- [ ] 实现 `BracePositionDetector` 模块
+- [ ] 实现躯干/背部姿态判别（背部与座椅夹角检测）
+- [ ] 实现头部/颈部姿态判别（面向机头/机尾两种模式）
+- [ ] 实现上肢/手部姿态判别（双臂交叉/双手放大腿）
+- [ ] 实现下肢/脚部姿态判别（膝关节角度85°-95°）
+- [ ] 实现姿态稳定性检测算法
+- [ ] 定义 `BodyPartStatus` 和 `BracePositionResult` 数据结构
+- [ ] 编写防冲击姿势单元测试
+
 ### 核心文件
 ```
 backend/src/perception/
-├── pose_detector.py     # 基类
-├── mediapipe_pose.py    # MediaPipe实现
+├── pose_detector.py          # 基类
+├── mediapipe_pose.py         # MediaPipe实现
 
 backend/src/analysis/
-├── pose_analyzer.py     # 夹角计算/姿态分析
+├── pose_analyzer.py          # 夹角计算/姿态分析
+├── brace_position_detector.py  # 防冲击姿势检测模块
 ```
 
 ### 关键算法
 - 33关键点提取
 - 三角函数计算关节角度
-- 姿态分类（standing/squatting/bending）
+- 姿态分类（standing/squatting/bending/brace）
+- 多部位姿态综合判定
+- 姿态稳定性时序分析
 
 ### 验收标准
 - 视频画面实时叠加骨骼显示
 - 能计算并显示关节角度
 - 能判断当前姿态类型
+- **能检测防冲击姿势各部位合规性**
+- **能输出姿态到位时间和稳定保持时长**
 
 ---
 
@@ -245,15 +260,29 @@ backend/src/analysis/
 - [ ] 实现 `Synchronizer` 多模态数据同步器
 - [ ] 编写单元测试
 
+#### 场景触发识别
+- [ ] 实现教员指令触发识别（ASR关键词检测："Brace"/"防冲击"等）
+- [ ] 实现训练系统事件触发识别（API对接）
+- [ ] 实现姿态突变触发检测
+- [ ] 记录场景触发时间戳
+
+#### 防冲击场景时序判别
+- [ ] 定义 `brace_position` SOP规则（见示例）
+- [ ] 实现防冲击姿势完成时序判别
+- [ ] 实现姿态保持时长监测
+- [ ] 实现姿态偏移/失效检测
+- [ ] 输出场景级综合判定结论
+
 ### 核心文件
 ```
 backend/src/analysis/
-├── sop_analyzer.py        # 核心引擎
-├── synchronizer.py        # 多模态同步
-├── action_sequence.py     # 动作序列分析
+├── sop_analyzer.py           # 核心引擎
+├── synchronizer.py           # 多模态同步
+├── action_sequence.py        # 动作序列分析
+├── scenario_trigger.py       # 场景触发识别
 
 backend/config/
-├── sop_rules.yaml         # SOP规则定义
+├── sop_rules.yaml            # SOP规则定义
 ```
 
 ### 示例SOP规则
@@ -268,6 +297,27 @@ scenarios:
       - action: "grab_extinguisher"
         time_limit: 10
     max_total_time: 30
+
+  brace_position:
+    name: "防冲击姿势"
+    trigger_keywords: ["brace", "防冲击", "防冲击姿势"]
+    time_limit: 5                     # 5秒内完成姿态
+    min_hold_duration: 30             # 至少保持30秒
+    body_parts:
+      torso:
+        name: "躯干与背部"
+        max_angle_deviation: 10
+      head:
+        name: "头部与颈部"
+        position: "rear_facing"
+      arms:
+        name: "上肢与手部"
+        position: "crossed"
+      legs:
+        name: "下肢与脚部"
+        knee_angle_min: 85
+        knee_angle_max: 95
+        feet_flat: true
 ```
 
 ### 验收标准
@@ -275,6 +325,9 @@ scenarios:
 - 能检测动作序列是否符合规范
 - 能检测时间窗口合规性
 - 能输出违规项列表
+- **能识别防冲击场景触发**
+- **能判别防冲击姿势完成时序**
+- **能监测姿态保持稳定性**
 
 ---
 
@@ -504,5 +557,5 @@ docker/
 
 ---
 
-**文档版本**: v1.0
-**最后更新**: 2024-12-22
+**文档版本**: v1.1
+**最后更新**: 2025-12-23

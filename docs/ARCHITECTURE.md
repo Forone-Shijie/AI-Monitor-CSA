@@ -20,6 +20,28 @@
 3. **通讯及时性监测** - 通过ASR监测术语规范性和响应时间
 4. **评估与打分** - 三维度评分 + AI改进建议报告
 
+### 1.3 需求概述
+
+#### 服务对象
+- **客舱训练质量评估** - 对乘务员训练表现进行客观化、数据化评估
+- **教员教学复盘** - 提供详细的训练数据支持教学改进
+- **胜任力评估数据基础** - 为后续智能化胜任力评估系统建设提供数据积累
+
+#### 核心能力要求
+系统不仅关注静态姿态是否标准，更侧重于：
+- 关键安全动作是否被正确执行
+- 动作发生的**时间点、持续时间与先后顺序**是否符合 SOP 要求
+- 人员与设备之间的**关键交互是否精准、及时**
+
+#### 骨骼关键点识别要求
+需至少识别并持续追踪以下关键点：
+- 头部、颈部
+- 脊柱（上背 / 下背）
+- 肩、肘、腕
+- 髋、膝、踝
+
+支持坐姿、站姿及动作切换过程中的稳定识别。
+
 ---
 
 ## 2. 系统架构
@@ -236,6 +258,112 @@ class SOPComplianceResult:
 
 示例报告输出：
 > "在火情处置中，由于重心不稳导致取灭火器动作延迟2秒，建议加强核心力量训练"
+
+---
+
+### 4.5 防冲击姿势场景检测模块 (BracePositionDetector)
+
+防冲击姿势（Brace Position）是客舱安全训练的核心场景之一，属于**单一关键动作场景 + 多姿态约束 + 时间维度判别**的复合检测任务。
+
+#### 4.5.1 场景触发识别
+
+系统需识别防冲击姿势场景的开始条件：
+
+| 触发类型 | 触发方式 | 检测方法 |
+|---------|---------|---------|
+| 教员指令 | "Brace" / "防冲击姿势" | ASR关键词检测 |
+| 系统事件 | 模拟迫降、紧急着陆 | 训练系统事件API |
+| 姿态变化 | 乘务员开始调整姿态 | 姿态突变检测 |
+
+系统记录**场景触发时间戳**。
+
+#### 4.5.2 姿态到位判别逻辑
+
+基于 SOP 标准库，对防冲击姿势是否"到位"进行综合判定：
+
+**（1）躯干与背部姿态**
+- 上背部、下背部是否紧贴座椅靠背
+- 脊柱是否处于稳定收紧状态
+- 检测指标：背部与座椅夹角 < 10°
+
+**（2）头部与颈部姿态**
+- 面向机尾：头部是否贴靠座椅靠背或头枕
+- 面向机头：下颌是否内收并靠近胸部
+- 检测指标：颈椎角度偏差
+
+**（3）上肢与手部姿态**
+- 面向机尾：双臂是否在胸前交叉，且未抓握安全带
+- 面向机头：双手是否自然放置于大腿
+- 检测指标：手腕位置相对于胸部/大腿的距离
+
+**（4）下肢与脚部姿态**
+- 膝关节弯曲角度是否接近 SOP 要求（约90°）
+- 双脚是否平放地板
+- 是否符合有/无前舱壁条件下的腿部位置要求
+- 检测指标：膝关节角度 85°-95°
+
+#### 4.5.3 时序判别与稳定性检测
+
+**时序判别**
+- 从场景触发到姿态"完全到位"的时间
+- 是否在 SOP 规定的时间窗口内完成
+- 是否存在明显延迟或反复调整行为
+
+**稳定性检测**
+- 姿态是否在规定时间内保持稳定
+- 是否出现明显抬头、松背、松腿等姿态松散行为
+- 是否提前解除防冲击姿势
+
+#### 4.5.4 输出数据结构
+
+```python
+@dataclass
+class BodyPartStatus:
+    part_name: str                      # 部位名称: torso/head/arms/legs
+    is_compliant: bool                  # 是否合规
+    deviation: float                    # 偏差值
+    description: str                    # 状态描述
+
+@dataclass
+class BracePositionResult:
+    scenario_id: str                    # 场景ID
+    trigger_time: float                 # 场景触发时间
+    trigger_type: str                   # 触发类型: voice/event/posture
+    completion_time: float              # 姿态到位时间
+    time_to_complete: float             # 完成耗时
+    is_compliant: bool                  # 整体是否合规
+    body_parts: Dict[str, BodyPartStatus]  # 各部位状态
+    stability_duration: float           # 稳定保持时长
+    stability_lost_at: Optional[float]  # 姿态失效时间点
+    violations: List[str]               # 违规项列表
+```
+
+#### 4.5.5 SOP规则定义
+
+```yaml
+# sop_rules.yaml
+scenarios:
+  brace_position:
+    name: "防冲击姿势"
+    trigger_keywords: ["brace", "防冲击", "防冲击姿势"]
+    time_limit: 5                       # 5秒内完成姿态
+    min_hold_duration: 30               # 至少保持30秒
+    body_parts:
+      torso:
+        name: "躯干与背部"
+        max_angle_deviation: 10         # 背部与座椅最大夹角
+      head:
+        name: "头部与颈部"
+        position: "rear_facing"         # 或 front_facing
+      arms:
+        name: "上肢与手部"
+        position: "crossed"             # 或 on_thighs
+      legs:
+        name: "下肢与脚部"
+        knee_angle_min: 85
+        knee_angle_max: 95
+        feet_flat: true
+```
 
 ---
 
@@ -469,6 +597,12 @@ class EvaluationResult:
 
 ---
 
-**文档版本**: v1.0
-**最后更新**: 2024-12-22
+## 10. 参考文档
+
+- [技术栈推荐矩阵](./Technology_Stack_Recommendation.md) - 企业级技术选型规范参考
+
+---
+
+**文档版本**: v1.1
+**最后更新**: 2025-12-23
 **作者**: AI Monitor Project Team
