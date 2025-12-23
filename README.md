@@ -112,9 +112,10 @@
 | 后端框架 | Python 3.10+, FastAPI |
 | 姿态检测 | MediaPipe Pose (33关键点) |
 | 动作识别 | ST-GCN + LSTM |
-| 语音识别 | Whisper ASR |
+| 语音识别 | 豆包 ASR API / Whisper (双模式) |
 | 数据库 | PostgreSQL + Redis |
-| 前端框架 | React + TypeScript, Vite |
+| 前端框架 | Vue 3 + TypeScript, Vite |
+| UI组件库 | Element Plus |
 | 可视化 | ECharts + Three.js (3D骨骼) |
 
 ---
@@ -200,10 +201,12 @@ AI-Monitor-CSA/
 │   ├── config/               # 配置文件
 │   └── tests/                # 测试
 │
-├── frontend/                 # 前端项目 (React + TypeScript)
+├── frontend/                 # 前端项目 (Vue 3 + TypeScript)
 │   └── src/
-│       ├── pages/            # 页面
-│       └── components/       # 组件
+│       ├── views/            # 页面视图
+│       ├── components/       # 组件
+│       ├── stores/           # Pinia 状态管理
+│       └── router/           # Vue Router
 │
 ├── models/                   # AI模型文件
 ├── docs/                     # 文档

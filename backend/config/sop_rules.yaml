@@ -1,0 +1,220 @@
+# CC-SOP Monitor - SOP Rules Configuration
+# Standard Operating Procedures Definition
+
+# === Scenario Definitions ===
+scenarios:
+  # Brace Position Scenario
+  brace_position:
+    name: "防冲击姿势"
+    name_en: "Brace Position"
+    description: "紧急迫降时的防冲击姿势标准流程"
+    priority: "critical"
+
+    # Trigger conditions
+    trigger:
+      keywords:
+        - "brace"
+        - "防冲击"
+        - "防冲击姿势"
+        - "brace position"
+      pose_change_threshold: 0.8  # Significant posture change detection
+
+    # Timing requirements
+    timing:
+      max_completion_time: 5.0    # Must complete within 5 seconds
+      min_hold_duration: 30.0     # Must hold for at least 30 seconds
+      stability_check_interval: 1.0  # Check stability every second
+
+    # Body part requirements
+    body_parts:
+      torso:
+        name: "躯干与背部"
+        name_en: "Torso and Back"
+        requirement: "紧贴座椅靠背"
+        max_angle_deviation: 10  # degrees from seat back
+
+      head:
+        name: "头部与颈部"
+        name_en: "Head and Neck"
+        positions:
+          rear_facing:
+            name: "面向机尾"
+            requirement: "头部贴靠头枕"
+          front_facing:
+            name: "面向机头"
+            requirement: "下颌内收，头部低垂"
+
+      arms:
+        name: "上肢与手部"
+        name_en: "Arms and Hands"
+        positions:
+          crossed:
+            name: "双臂交叉"
+            requirement: "双臂交叉于胸前"
+          on_thighs:
+            name: "双手放大腿"
+            requirement: "双手平放于大腿上"
+
+      legs:
+        name: "下肢与脚部"
+        name_en: "Legs and Feet"
+        requirement: "膝关节约90度，双脚平放"
+        knee_angle_min: 85
+        knee_angle_max: 95
+        feet_flat: true
+
+    # Scoring weights within this scenario
+    scoring:
+      torso_weight: 0.25
+      head_weight: 0.25
+      arms_weight: 0.25
+      legs_weight: 0.25
+
+  # Fire Emergency Scenario
+  fire_emergency:
+    name: "火警处置流程"
+    name_en: "Fire Emergency Procedure"
+    description: "客舱火警处置标准流程"
+    priority: "high"
+
+    trigger:
+      keywords:
+        - "火警"
+        - "fire"
+        - "smoke"
+        - "烟雾"
+      event_type: "fire_alarm"
+
+    steps:
+      - step_id: 1
+        action: "ACT_001"
+        action_name: "按压呼叫按钮"
+        action_name_en: "Press Call Button"
+        time_limit: 3  # seconds
+        required: true
+        description: "立即通知驾驶舱"
+
+      - step_id: 2
+        action: "ACT_002"
+        action_name: "提起灭火器"
+        action_name_en: "Grab Fire Extinguisher"
+        time_limit: 10
+        required: true
+        description: "取出灭火器准备灭火"
+
+      - step_id: 3
+        action: "ACT_003"
+        action_name: "佩戴防烟面罩"
+        action_name_en: "Put on Smoke Hood"
+        time_limit: 15
+        required: true
+        description: "保护呼吸道"
+
+    max_total_time: 30
+    scoring:
+      timing_weight: 0.5
+      sequence_weight: 0.3
+      completeness_weight: 0.2
+
+  # Emergency Evacuation Scenario
+  emergency_evacuation:
+    name: "应急撤离流程"
+    name_en: "Emergency Evacuation Procedure"
+    description: "紧急撤离标准流程"
+    priority: "critical"
+
+    trigger:
+      keywords:
+        - "撤离"
+        - "evacuate"
+        - "emergency exit"
+      event_type: "evacuation_command"
+
+    steps:
+      - step_id: 1
+        action: "ACT_004"
+        action_name: "打开应急门"
+        action_name_en: "Open Emergency Exit"
+        time_limit: 5
+        required: true
+
+      - step_id: 2
+        action: "ACT_006"
+        action_name: "指挥撤离"
+        action_name_en: "Direct Evacuation"
+        time_limit: null  # Continuous
+        required: true
+
+    max_total_time: 90
+
+# === Action Definitions ===
+actions:
+  ACT_001:
+    name: "按压呼叫按钮"
+    name_en: "Press Call Button"
+    category: "communication"
+    detection_method: "pose"  # or "object_interaction"
+
+  ACT_002:
+    name: "提起灭火器"
+    name_en: "Grab Fire Extinguisher"
+    category: "safety_equipment"
+    detection_method: "pose"
+
+  ACT_003:
+    name: "佩戴防烟面罩"
+    name_en: "Put on Smoke Hood"
+    category: "safety_equipment"
+    detection_method: "pose"
+
+  ACT_004:
+    name: "打开应急门"
+    name_en: "Open Emergency Exit"
+    category: "evacuation"
+    detection_method: "pose"
+
+  ACT_005:
+    name: "安全带检查"
+    name_en: "Seatbelt Check"
+    category: "inspection"
+    detection_method: "pose"
+
+  ACT_006:
+    name: "指挥撤离"
+    name_en: "Direct Evacuation"
+    category: "evacuation"
+    detection_method: "pose"
+
+  ACT_BRACE:
+    name: "进入防冲击姿势"
+    name_en: "Enter Brace Position"
+    category: "brace"
+    detection_method: "pose"
+
+# === Communication Terminology ===
+terminology:
+  required_terms:
+    - term: "收到"
+      english: "Roger"
+      context: "确认通讯"
+
+    - term: "明白"
+      english: "Understood"
+      context: "确认指令"
+
+    - term: "执行"
+      english: "Execute"
+      context: "开始行动"
+
+    - term: "完毕"
+      english: "Complete"
+      context: "任务完成"
+
+  prohibited_terms:
+    - term: "好的"
+      reason: "非标准术语"
+      alternative: "收到"
+
+    - term: "OK"
+      reason: "非标准术语"
+      alternative: "明白"

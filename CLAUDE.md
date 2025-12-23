@@ -13,9 +13,10 @@ CC-SOP Monitor (客舱乘务员姿态与操作规范监测系统) - An AI traini
 - **Backend**: Python 3.10+, FastAPI
 - **Pose Detection**: MediaPipe Pose (33 keypoints)
 - **Action Recognition**: ST-GCN + LSTM
-- **Speech Recognition**: Whisper ASR
+- **Speech Recognition**: Doubao ASR API (primary) / Whisper (local fallback)
 - **Database**: PostgreSQL + Redis
-- **Frontend**: React + TypeScript, Vite
+- **Frontend**: Vue 3 + TypeScript, Vite
+- **UI Components**: Element Plus
 - **Visualization**: ECharts + Three.js (3D skeleton)
 
 ## Development Commands
@@ -79,7 +80,7 @@ Input Layer (Video/Audio) → Synchronizer (Multi-modal Alignment)
 Perception Layer
 ├── PoseDetector (MediaPipe) → keypoints, angles, pose_type
 ├── ActionRecognizer (ST-GCN) → action events with timestamps
-└── ASR (Whisper) → transcribed text with timestamps
+└── ASR (Doubao/Whisper) → transcribed text with timestamps
     ↓
 Analysis Layer
 ├── SOPAnalyzer → compares action sequences against SOP rules
@@ -102,7 +103,7 @@ All perception modules use abstract base classes with concrete implementations:
 - `VideoSource` (base) → `CameraInput`, `RTSPInput`, `FileInput`
 - `PoseDetector` (base) → `MediaPipePose`
 - `ActionRecognizer` (base) → `STGCNRecognizer`
-- `ASREngine` (base) → `WhisperASR`
+- `ASREngine` (base) → `DoubaoASR`, `WhisperASR`
 
 ## Configuration
 

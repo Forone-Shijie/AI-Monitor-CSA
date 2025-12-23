@@ -1,0 +1,128 @@
+# CC-SOP Monitor Configuration
+# Version: 0.1.0
+
+# === System Settings ===
+system:
+  name: "CC-SOP Monitor"
+  version: "0.1.0"
+  language: "zh"
+  log_level: "INFO"
+  debug: true
+
+# === Server Settings ===
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  reload: true  # Development only
+
+# === Database Settings ===
+database:
+  host: "localhost"
+  port: 5432
+  name: "cc_sop_monitor"
+  user: "cc_admin"
+  password: ""  # Set via environment variable: DATABASE_PASSWORD
+  pool_size: 5
+  max_overflow: 10
+
+# === Redis Settings ===
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  password: ""  # Set via environment variable: REDIS_PASSWORD
+
+# === Pose Detection Settings ===
+pose:
+  engine: "mediapipe"
+  model_complexity: 1  # 0=Lite, 1=Full, 2=Heavy
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+  enable_segmentation: false
+
+# === Brace Position Detection ===
+brace_position:
+  # Torso/Back
+  max_torso_angle_deviation: 10  # degrees from vertical
+
+  # Head/Neck
+  head_positions:
+    - "rear_facing"   # Face to tail, head against headrest
+    - "front_facing"  # Face to nose, chin tucked
+
+  # Arms
+  arm_positions:
+    - "crossed"       # Arms crossed over chest
+    - "on_thighs"     # Hands on thighs
+
+  # Legs
+  knee_angle_min: 85  # degrees
+  knee_angle_max: 95  # degrees
+  feet_flat_required: true
+
+  # Timing
+  max_completion_time: 5.0  # seconds to complete posture
+  min_hold_duration: 30.0   # minimum hold time in seconds
+  stability_threshold: 0.85  # 0-1 score for stability
+
+# === ASR Settings ===
+asr:
+  # Default engine: api (Doubao) or local (Whisper)
+  default_engine: "api"
+
+  # Doubao API Settings (P1 Priority)
+  doubao:
+    api_key: ""  # Set via environment variable: DOUBAO_API_KEY
+    base_url: "https://openspeech.bytedance.com/api/v1/asr"
+    language: "zh"
+    sample_rate: 16000
+
+  # Whisper Local Settings (P2 Later)
+  whisper:
+    model_size: "small"  # tiny, base, small, medium, large
+    language: "zh"
+    device: "cuda"  # cuda or cpu
+    compute_type: "float16"
+
+# === Evaluation Settings ===
+evaluation:
+  weights:
+    pose: 0.30        # 30% - Posture standard score
+    action: 0.40      # 40% - Action timing score
+    communication: 0.30  # 30% - Communication score
+
+  # LLM for report generation
+  llm:
+    model: "qwen2.5:7b"
+    base_url: "http://localhost:11434"
+    temperature: 0.7
+    max_tokens: 2048
+
+# === Video Input Settings ===
+video:
+  default_fps: 30
+  default_resolution: [1920, 1080]
+  buffer_size: 10  # frames
+
+  # RTSP Settings
+  rtsp:
+    timeout: 10  # seconds
+    reconnect_attempts: 3
+
+# === Logging Settings ===
+logging:
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
+  rotation: "10 MB"
+  retention: "7 days"
+  compression: "zip"
+  path: "logs/"
+
+# === CORS Settings ===
+cors:
+  allow_origins:
+    - "http://localhost:5173"
+    - "http://localhost:3000"
+  allow_credentials: true
+  allow_methods: ["*"]
+  allow_headers: ["*"]

@@ -1,0 +1,201 @@
+/**
+ * CC-SOP Monitor HUD Theme
+ * Aviation-style HUD interface with deep blue and cyan glow
+ */
+
+:root {
+  /* Primary Colors */
+  --hud-bg: rgba(10, 22, 40, 0.95);
+  --hud-bg-light: rgba(15, 30, 55, 0.9);
+  --hud-bg-dark: rgba(5, 15, 30, 0.98);
+
+  /* Accent Colors */
+  --hud-border: #00d4ff;
+  --hud-border-dim: rgba(0, 212, 255, 0.3);
+  --hud-glow: 0 0 10px rgba(0, 212, 255, 0.5);
+  --hud-glow-strong: 0 0 20px rgba(0, 212, 255, 0.7);
+
+  /* Status Colors */
+  --hud-success: #00ff88;
+  --hud-warning: #ffcc00;
+  --hud-danger: #ff4444;
+  --hud-info: #00d4ff;
+
+  /* Text Colors */
+  --hud-text-primary: #ffffff;
+  --hud-text-secondary: rgba(255, 255, 255, 0.7);
+  --hud-text-muted: rgba(255, 255, 255, 0.4);
+
+  /* Fonts */
+  --font-cn: "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-en: "Times New Roman", "Georgia", serif;
+  --font-mono: "Consolas", "Monaco", monospace;
+
+  /* Spacing */
+  --hud-spacing-xs: 4px;
+  --hud-spacing-sm: 8px;
+  --hud-spacing-md: 16px;
+  --hud-spacing-lg: 24px;
+  --hud-spacing-xl: 32px;
+
+  /* Border Radius */
+  --hud-radius-sm: 4px;
+  --hud-radius-md: 8px;
+  --hud-radius-lg: 12px;
+
+  /* Transitions */
+  --hud-transition: 0.3s ease;
+}
+
+/* Global Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-cn);
+  background-color: var(--hud-bg-dark);
+  color: var(--hud-text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* HUD Panel Component */
+.hud-panel {
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border-dim);
+  border-radius: var(--hud-radius-md);
+  padding: var(--hud-spacing-md);
+  box-shadow: var(--hud-glow);
+  transition: var(--hud-transition);
+}
+
+.hud-panel:hover {
+  border-color: var(--hud-border);
+  box-shadow: var(--hud-glow-strong);
+}
+
+.hud-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--hud-spacing-sm);
+  border-bottom: 1px solid var(--hud-border-dim);
+  margin-bottom: var(--hud-spacing-md);
+}
+
+.hud-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hud-border);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* HUD Button */
+.hud-button {
+  background: transparent;
+  border: 1px solid var(--hud-border);
+  color: var(--hud-border);
+  padding: var(--hud-spacing-sm) var(--hud-spacing-md);
+  border-radius: var(--hud-radius-sm);
+  font-family: var(--font-cn);
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--hud-transition);
+}
+
+.hud-button:hover {
+  background: rgba(0, 212, 255, 0.1);
+  box-shadow: var(--hud-glow);
+}
+
+.hud-button:active {
+  background: rgba(0, 212, 255, 0.2);
+}
+
+.hud-button--primary {
+  background: var(--hud-border);
+  color: var(--hud-bg-dark);
+}
+
+.hud-button--primary:hover {
+  background: #33ddff;
+}
+
+/* HUD Status Indicators */
+.hud-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hud-spacing-xs);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.hud-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.hud-status--success .hud-status-dot {
+  background: var(--hud-success);
+  box-shadow: 0 0 8px var(--hud-success);
+}
+
+.hud-status--warning .hud-status-dot {
+  background: var(--hud-warning);
+  box-shadow: 0 0 8px var(--hud-warning);
+}
+
+.hud-status--danger .hud-status-dot {
+  background: var(--hud-danger);
+  box-shadow: 0 0 8px var(--hud-danger);
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: var(--hud-glow);
+  }
+  50% {
+    box-shadow: var(--hud-glow-strong);
+  }
+}
+
+/* Number Display (English font) */
+.hud-number {
+  font-family: var(--font-en);
+  font-weight: 600;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--hud-bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--hud-border-dim);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hud-border);
+}

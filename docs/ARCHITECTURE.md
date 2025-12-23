@@ -69,7 +69,7 @@
 │  ┌─────────────┐       ┌─────────────┐       ┌─────────────┐           │
 │  │  姿态检测   │       │  动作识别   │       │  语音识别   │           │
 │  │PoseDetector │       │ActionRecog  │       │    ASR      │           │
-│  │ MediaPipe   │       │ ST-GCN/CNN  │       │  Whisper    │           │
+│  │ MediaPipe   │       │ ST-GCN/CNN  │       │ 豆包/Whisper│           │
 │  └──────┬──────┘       └──────┬──────┘       └──────┬──────┘           │
 │         │                     │                     │                   │
 │         └─────────────────────┼─────────────────────┘                   │
@@ -126,10 +126,11 @@
 | **后端框架** | FastAPI | Flask | 高性能异步API |
 | **姿态检测** | MediaPipe Pose | OpenPose | 实时性好，部署简单 |
 | **动作识别** | ST-GCN + LSTM | SlowFast | 基于骨骼的动作识别 |
-| **语音识别** | Whisper | FunASR | 中文支持好 |
+| **语音识别** | 豆包 ASR API | Whisper (本地) | 双模式：API优先开发，本地后续部署 |
 | **时序分析** | 自定义规则引擎 | - | 基于SOP标准库 |
 | **数据库** | PostgreSQL + Redis | - | 持久化 + 缓存 |
-| **前端框架** | React + TypeScript | Vue3 | 组件化开发 |
+| **前端框架** | Vue 3 + TypeScript | React | 企业推荐，Vite构建 |
+| **UI组件库** | Element Plus | Ant Design Vue | 桌面端组件丰富 |
 | **可视化** | ECharts + Three.js | D3.js | 3D骨骼可视化 |
 | **视频处理** | OpenCV + FFmpeg | - | 视频流处理 |
 | **消息队列** | Redis Streams | RabbitMQ | 实时数据流 |
@@ -403,7 +404,8 @@ AI-Monitor-CSA/
 │   │   │   ├── action_recognizer.py   # 动作识别基类
 │   │   │   ├── stgcn_recognizer.py    # ST-GCN实现
 │   │   │   ├── asr_engine.py          # ASR基类
-│   │   │   └── whisper_asr.py         # Whisper实现
+│   │   │   ├── doubao_asr.py          # 豆包API实现（优先）
+│   │   │   └── whisper_asr.py         # Whisper本地实现（后续）
 │   │   │
 │   │   ├── analysis/                  # 分析层
 │   │   │   ├── synchronizer.py        # 多模态数据同步
@@ -447,23 +449,27 @@ AI-Monitor-CSA/
 │       ├── test_action_recognizer.py
 │       └── test_sop_analyzer.py
 │
-├── frontend/                          # 前端项目
+├── frontend/                          # 前端项目 (Vue 3 + TypeScript)
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── vite.config.ts
 │   └── src/
-│       ├── main.tsx
-│       ├── App.tsx
+│       ├── main.ts                    # 入口文件
+│       ├── App.vue                    # 根组件
 │       ├── components/                # 组件
 │       │   ├── layout/
 │       │   ├── monitoring/            # 实时监控组件
 │       │   ├── playback/              # 录像回放组件
 │       │   └── reports/               # 报告组件
-│       ├── pages/                     # 页面
-│       │   ├── Dashboard.tsx
-│       │   ├── LiveMonitor.tsx
-│       │   ├── PlaybackAnalysis.tsx
-│       │   └── Reports.tsx
+│       ├── views/                     # 页面视图
+│       │   ├── Dashboard.vue
+│       │   ├── LiveMonitor.vue
+│       │   ├── PlaybackAnalysis.vue
+│       │   └── Reports.vue
+│       ├── stores/                    # Pinia 状态管理
+│       │   └── index.ts
+│       ├── router/                    # Vue Router
+│       │   └── index.ts
 │       └── styles/                    # 样式
 │           ├── hud-theme.css
 │           └── variables.css
