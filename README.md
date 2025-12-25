@@ -311,4 +311,4 @@ Proprietary - China Southern Airlines
 
 ## 联系方式
 
-如有问题，请联系项目负责人。
+如有问题，请联系项目负责人 张士杰，Email：sjzhang1130@gmail.com。
