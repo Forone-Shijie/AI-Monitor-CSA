@@ -69,7 +69,7 @@
 │  ┌─────────────┐       ┌─────────────┐       ┌─────────────┐           │
 │  │  姿态检测   │       │  动作识别   │       │  语音识别   │           │
 │  │PoseDetector │       │ActionRecog  │       │    ASR      │           │
-│  │ MediaPipe   │       │ ST-GCN/CNN  │       │ 豆包/Whisper│           │
+│  │ MediaPipe   │       │ ST-GCN/CNN  │       │   FunASR    │          │
 │  └──────┬──────┘       └──────┬──────┘       └──────┬──────┘           │
 │         │                     │                     │                   │
 │         └─────────────────────┼─────────────────────┘                   │
@@ -126,7 +126,8 @@
 | **后端框架** | FastAPI | Flask | 高性能异步API |
 | **姿态检测** | MediaPipe Pose | OpenPose | 实时性好，部署简单 |
 | **动作识别** | ST-GCN + LSTM | SlowFast | 基于骨骼的动作识别 |
-| **语音识别** | 豆包 ASR API | Whisper (本地) | 双模式：API优先开发，本地后续部署 |
+| **语音识别** | FunASR Paraformer | - | 本地部署，流式识别 |
+| **AI分析报告** | Ollama + Qwen2.5 | - | 本地LLM，姿态/通讯分析 |
 | **时序分析** | 自定义规则引擎 | - | 基于SOP标准库 |
 | **数据库** | PostgreSQL + Redis | - | 持久化 + 缓存 |
 | **前端框架** | Vue 3 + TypeScript | React | 企业推荐，Vite构建 |
@@ -404,8 +405,7 @@ AI-Monitor-CSA/
 │   │   │   ├── action_recognizer.py   # 动作识别基类
 │   │   │   ├── stgcn_recognizer.py    # ST-GCN实现
 │   │   │   ├── asr_engine.py          # ASR基类
-│   │   │   ├── doubao_asr.py          # 豆包API实现（优先）
-│   │   │   └── whisper_asr.py         # Whisper本地实现（后续）
+│   │   │   └── funasr_engine.py       # FunASR流式实现（规划中）
 │   │   │
 │   │   ├── analysis/                  # 分析层
 │   │   │   ├── synchronizer.py        # 多模态数据同步
@@ -419,7 +419,8 @@ AI-Monitor-CSA/
 │   │   │   ├── pose_scorer.py         # 姿态标准分
 │   │   │   ├── action_scorer.py       # 动作时效分
 │   │   │   ├── communication_scorer.py # 沟通协同分
-│   │   │   └── report_generator.py    # 报告生成器
+│   │   │   ├── report_generator.py    # 报告生成器
+│   │   │   └── ollama_client.py       # Ollama LLM客户端（规划中）
 │   │   │
 │   │   ├── models/                    # 数据模型
 │   │   │   ├── pose.py                # 姿态数据模型
@@ -609,6 +610,6 @@ class EvaluationResult:
 
 ---
 
-**文档版本**: v1.1
-**最后更新**: 2025-12-23
+**文档版本**: v1.2
+**最后更新**: 2025-12-25
 **作者**: AI Monitor Project Team

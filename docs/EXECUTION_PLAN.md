@@ -226,16 +226,13 @@ models/action/
 ### 任务清单
 - [x] 实现 `ASREngine` 基类
 - [x] 实现 `ASRResult`, `ASRSegment` 数据结构
-- [x] 实现 `WhisperASR` 本地语音识别 (离线模式)
-- [x] 实现 `DoubaoASR` 豆包API在线识别 (在线模式)
-- [x] 实现 `HybridASR` 智能切换器 (联网用API，断网用本地)
-- [x] 实现 `MockWhisperASR`, `MockDoubaoASR`, `MockHybridASR` 测试用实现
 - [x] 定义标准航空术语词表 (`STANDARD_TERMINOLOGY`)
 - [x] 实现 `CommunicationAnalyzer` 通讯分析器
 - [x] 实现术语匹配检测
 - [x] 实现响应时间分析
 - [x] 实现清晰度评分
-- [x] 编写单元测试 (47个测试全部通过)
+- [x] 编写单元测试
+- [ ] 实现 `FunASREngine` 流式语音识别 (Phase 10A)
 
 ### 完成时间
 2025-12-23
@@ -244,9 +241,7 @@ models/action/
 ```
 backend/src/perception/
 ├── asr_engine.py          # 基类、数据结构、标准术语
-├── whisper_asr.py         # Whisper本地实现 (离线)
-├── doubao_asr.py          # 豆包API实现 (在线)
-├── hybrid_asr.py          # 智能切换 (自动 online/offline)
+├── funasr_engine.py       # FunASR流式实现 (Phase 10A)
 
 backend/src/analysis/
 ├── communication_analyzer.py  # 术语分析、响应时间、清晰度评分
@@ -255,9 +250,7 @@ backend/src/analysis/
 ### ASR 模式说明
 | 模式 | 引擎 | 适用场景 |
 |------|------|---------|
-| **在线模式** | DoubaoASR | 联网状态，高精度、低延迟 |
-| **离线模式** | WhisperASR | 断网/隐私要求，本地模型 |
-| **自动模式** | HybridASR | 自动检测网络，智能切换 |
+| **流式模式** | FunASR (规划中) | Phase 10A实现，低延迟流式识别 |
 
 ### 术语检测功能
 - 紧急指令检测 (brace/evacuate/fire)
@@ -265,21 +258,12 @@ backend/src/analysis/
 - 通讯确认术语 (收到/明白/确认)
 - 协调术语 (准备完毕/已清空/协助)
 
-### 环境变量配置
-```bash
-# 豆包API配置 (可选，不配置则使用本地Whisper)
-DOUBAO_APP_ID=your_app_id
-DOUBAO_ACCESS_TOKEN=your_access_token
-DOUBAO_CLUSTER=volcengine_streaming_common
-```
-
 ### 验收标准
 - [x] 能识别中文语音转文字
 - [x] 能检测标准航空术语
 - [x] 能分析响应时间
 - [x] 能评估通讯清晰度
-- [x] 支持在线/离线智能切换
-- [x] 所有测试通过 (47/47)
+- [x] 所有测试通过
 
 ---
 
@@ -736,27 +720,86 @@ docs/
 
 ---
 
-## Phase 10: 部署与交付
+## Phase 10: 本地AI部署与交付
 
 ### 目标
-完成Docker部署和文档交付
+完成本地AI模型集成和Docker部署
 
-### 任务清单
+### 阶段划分
+
+#### Phase 10A: FunASR流式语音识别集成
+
+**任务清单**
+- [ ] 安装FunASR依赖 (`pip install funasr modelscope`)
+- [ ] 新建 `backend/src/perception/funasr_engine.py`
+  - 继承现有`ASREngine`基类
+  - 实现流式识别接口 (Paraformer-streaming)
+  - 支持VAD + ASR + 标点恢复
+- [ ] 更新 `backend/src/api/routes/websocket.py` 集成FunASR
+- [ ] 编写测试用例 `backend/tests/test_funasr.py`
+
+**性能指标**
+- 识别延迟: < 600ms
+- 字错率(CER): < 6%
+- 显存占用: ~2-4GB
+
+#### Phase 10B: Ollama + Qwen本地LLM集成
+
+**任务清单**
+- [ ] 安装Ollama (`curl -fsSL https://ollama.com/install.sh | sh`)
+- [ ] 拉取Qwen模型 (`ollama pull qwen2.5:14b`)
+- [ ] 新建 `backend/src/evaluation/ollama_client.py`
+  - 封装Ollama API调用
+  - 支持流式/非流式响应
+  - 处理超时和重试
+- [ ] 修改 `backend/src/evaluation/report_generator.py`
+  - 集成OllamaClient
+  - 设计姿态分析prompt模板
+  - 设计语音播报分析prompt模板
+- [ ] 编写测试用例 `backend/tests/test_ollama.py`
+
+**性能指标**
+- 报告生成时间: 3-8秒
+- 显存占用: ~14-20GB (报告生成时)
+
+#### Phase 10C: Docker容器化部署
+
+**任务清单**
 - [ ] 编写 `Dockerfile.backend`
 - [ ] 编写 `Dockerfile.frontend`
 - [ ] 编写 `docker-compose.yml`
 - [ ] 编写部署文档
 - [ ] 部署到本地服务器
 - [ ] 系统演示
-- [ ] 交付全部文档
 
-### Docker配置
+### 核心文件
 ```
+backend/src/perception/
+├── funasr_engine.py       # 新增: FunASR流式识别
+
+backend/src/evaluation/
+├── ollama_client.py       # 新增: Ollama API客户端
+├── report_generator.py    # 修改: 集成本地LLM
+
 docker/
 ├── Dockerfile.backend
 ├── Dockerfile.frontend
 └── docker-compose.yml
 ```
+
+### 硬件配置要求
+| 组件 | 推荐配置 |
+|------|----------|
+| GPU | NVIDIA RTX 3090 (24GB VRAM) |
+| CPU | AMD 7800X3D 或同等性能 |
+| 内存 | 32GB+ |
+| 存储 | 100GB+ SSD |
+
+### 显存分配策略
+| 阶段 | 加载模型 | 显存占用 |
+|------|----------|----------|
+| 训练实时监控 | Paraformer-streaming + MediaPipe | ~3-4GB |
+| 报告生成 | Qwen2.5-14B | ~14GB |
 
 ### 交付物清单
 - [ ] 源代码
@@ -768,6 +811,8 @@ docker/
 
 ### 验收标准
 - Docker一键部署成功
+- 本地语音识别延迟 < 600ms
+- AI报告生成正常工作
 - 系统独立运行
 - 文档完整
 
@@ -787,5 +832,5 @@ docker/
 
 ---
 
-**文档版本**: v1.6
-**最后更新**: 2025-12-23 (Phase 0/1/2/4/5/6/7/8/9 完成，共307个测试通过，系统集成完成)
+**文档版本**: v1.7
+**最后更新**: 2025-12-25 (Phase 0-9 完成，Phase 10 本地AI部署进行中)

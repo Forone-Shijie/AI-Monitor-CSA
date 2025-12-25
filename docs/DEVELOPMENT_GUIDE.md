@@ -92,12 +92,16 @@ redis:
   port: 6379
   db: 0
 
-# ASR配置
+# ASR配置 (本地部署)
 asr:
-  engine: "whisper"
-  model: "small"
-  language: "zh"
-  device: "cuda"  # 或 "cpu"
+  default_engine: "funasr"  # funasr (规划中)
+  # FunASR配置 (Phase 10A实现)
+  funasr:
+    model: "paraformer-zh-streaming"
+    vad_model: "fsmn-vad"
+    punc_model: "ct-punc"
+    device: "cuda"
+    sample_rate: 16000
 
 # 姿态检测配置
 pose:
@@ -114,11 +118,17 @@ action:
 
 # 评估配置
 evaluation:
-  pose_weight: 0.3
-  action_weight: 0.4
-  communication_weight: 0.3
-  llm_model: "qwen2.5:7b"
-  llm_base_url: "http://localhost:11434"
+  weights:
+    pose: 0.3
+    action: 0.4
+    communication: 0.3
+  # 本地LLM配置 (Ollama)
+  llm:
+    provider: "ollama"
+    model: "qwen2.5:14b"  # 或 qwen2.5:7b (轻量版)
+    base_url: "http://localhost:11434"
+    temperature: 0.7
+    max_tokens: 2048
 
 # 服务器配置
 server:
@@ -590,16 +600,16 @@ npm run build
 ### Q1: MediaPipe初始化失败
 **A**: 确保安装了正确版本的 mediapipe，并检查是否有足够的系统权限。
 
-### Q2: Whisper模型加载慢
-**A**: 首次加载会下载模型，后续会使用缓存。可以预先运行下载脚本。
+### Q2: FunASR模型加载慢
+**A**: 首次加载会从ModelScope下载模型，后续会使用缓存 (~/.cache/modelscope/)。可以预先运行下载脚本。
 
 ### Q3: GPU内存不足
-**A**: 减小batch size，或使用更小的模型（如 whisper-small 替代 whisper-medium）。
+**A**: 减小batch size，或使用CPU模式运行ASR引擎。
 
 ### Q4: WebSocket连接断开
 **A**: 检查网络连接，增加心跳检测机制，或调整超时时间。
 
 ---
 
-**文档版本**: v1.0
-**最后更新**: 2024-12-22
+**文档版本**: v1.1
+**最后更新**: 2025-12-25

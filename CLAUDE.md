@@ -6,14 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CC-SOP Monitor (客舱乘务员姿态与操作规范监测系统) - An AI training evaluation system for China Southern Airlines cabin crew. The system monitors crew performance in training simulators through computer vision, action recognition, and speech analysis.
 
-**Current Status**: Project initialization phase (Phase 0). Documentation and architecture are defined; implementation is pending.
+**Current Status**: Phase 10 - Local AI Deployment. Core system (Phase 0-9) is complete. Now integrating local ASR (FunASR) and LLM (Ollama + Qwen).
 
 ## Technology Stack
 
 - **Backend**: Python 3.10+, FastAPI
 - **Pose Detection**: MediaPipe Pose (33 keypoints)
 - **Action Recognition**: ST-GCN + LSTM
-- **Speech Recognition**: Doubao ASR API (primary) / Whisper (local fallback)
+- **Speech Recognition**: FunASR Paraformer (planned)
+- **AI Analysis**: Ollama + Qwen2.5 (local LLM, planned)
 - **Database**: PostgreSQL + Redis
 - **Frontend**: Vue 3 + TypeScript, Vite
 - **UI Components**: Element Plus
@@ -80,7 +81,7 @@ Input Layer (Video/Audio) → Synchronizer (Multi-modal Alignment)
 Perception Layer
 ├── PoseDetector (MediaPipe) → keypoints, angles, pose_type
 ├── ActionRecognizer (ST-GCN) → action events with timestamps
-└── ASR (Doubao/Whisper) → transcribed text with timestamps
+└── ASR (FunASR) → transcribed text with timestamps
     ↓
 Analysis Layer
 ├── SOPAnalyzer → compares action sequences against SOP rules
@@ -103,7 +104,7 @@ All perception modules use abstract base classes with concrete implementations:
 - `VideoSource` (base) → `CameraInput`, `RTSPInput`, `FileInput`
 - `PoseDetector` (base) → `MediaPipePose`
 - `ActionRecognizer` (base) → `STGCNRecognizer`
-- `ASREngine` (base) → `DoubaoASR`, `WhisperASR`
+- `ASREngine` (base) → `FunASREngine` (planned)
 
 ## Configuration
 

@@ -1,7 +1,7 @@
 """
 ASR Engine - Abstract base class for Automatic Speech Recognition.
 
-Defines the interface for all ASR implementations (Whisper, Doubao API, etc.).
+Defines the interface for all ASR implementations (e.g., FunASR Paraformer).
 """
 
 from abc import ABC, abstractmethod
@@ -115,12 +115,13 @@ class ASREngine(ABC):
     All ASR implementations must inherit from this class.
 
     Usage:
-        engine = WhisperASR()
-        result = engine.transcribe(audio_data, sample_rate=16000)
-        if result.success:
-            print(f"Transcription: {result.text}")
-            for segment in result.segments:
-                print(f"  [{segment.start_time:.2f}s] {segment.text}")
+        # Example with FunASR (to be implemented)
+        # engine = FunASREngine()
+        # result = engine.transcribe(audio_data, sample_rate=16000)
+        # if result.success:
+        #     print(f"Transcription: {result.text}")
+        #     for segment in result.segments:
+        #         print(f"  [{segment.start_time:.2f}s] {segment.text}")
     """
 
     def __init__(

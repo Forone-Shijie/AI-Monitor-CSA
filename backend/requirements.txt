@@ -29,7 +29,7 @@ soundfile>=0.12.0
 
 # === AI/ML ===
 torch>=2.0.0
-# openai-whisper>=20230918  # P2: Whisper local mode (install later)
+# funasr  # 本地流式语音识别 (规划中)
 
 # === HTTP Client ===
 httpx>=0.24.0

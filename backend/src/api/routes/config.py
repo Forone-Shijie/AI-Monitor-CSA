@@ -220,9 +220,7 @@ async def get_asr_modes() -> Dict:
         "data": {
             "current": _config.asr_mode,
             "available": [
-                {"id": "auto", "name": "自动", "description": "在线优先，离线备份"},
-                {"id": "online", "name": "在线", "description": "仅使用豆包API"},
-                {"id": "offline", "name": "离线", "description": "仅使用本地Whisper"},
+                {"id": "funasr", "name": "FunASR", "description": "本地FunASR流式识别 (规划中)"},
             ],
         },
     }
@@ -237,10 +235,10 @@ async def set_asr_mode(mode: str) -> Dict:
     """Set ASR mode."""
     global _config
 
-    if mode not in ["auto", "online", "offline"]:
+    if mode not in ["funasr"]:
         raise HTTPException(
             status_code=400,
-            detail="Invalid mode. Must be 'auto', 'online', or 'offline'",
+            detail="Invalid mode. Must be 'funasr'",
         )
 
     _config.asr_mode = mode

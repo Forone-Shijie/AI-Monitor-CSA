@@ -91,7 +91,6 @@ module = [
     "cv2.*",
     "mediapipe.*",
     "torch.*",
-    "whisper.*",
 ]
 ignore_missing_imports = true
 

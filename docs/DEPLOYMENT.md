@@ -145,13 +145,20 @@ video:
   camera_id: 0
   fps: 30
 
-# ASR 配置
+# ASR 配置 (本地部署)
 asr:
-  mode: auto  # auto / online / offline
-  # 豆包 API (在线模式)
-  doubao:
-    app_id: ${DOUBAO_APP_ID}
-    access_token: ${DOUBAO_ACCESS_TOKEN}
+  default_engine: funasr  # funasr (规划中)
+  funasr:
+    model: paraformer-zh-streaming
+    vad_model: fsmn-vad
+    punc_model: ct-punc
+    device: cuda
+
+# LLM 配置 (本地Ollama)
+llm:
+  provider: ollama
+  model: qwen2.5:14b
+  base_url: http://localhost:11434
 
 # 评估权重
 evaluation:
@@ -164,12 +171,8 @@ evaluation:
 ### 环境变量
 
 ```bash
-# 豆包 ASR API (可选)
-export DOUBAO_APP_ID=your_app_id
-export DOUBAO_ACCESS_TOKEN=your_token
-
-# OpenAI (报告生成，可选)
-export OPENAI_API_KEY=your_api_key
+# Ollama 配置 (可选，默认本地)
+export OLLAMA_HOST=http://localhost:11434
 ```
 
 ### 前端配置

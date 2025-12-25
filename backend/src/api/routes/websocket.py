@@ -579,51 +579,25 @@ async def websocket_stream(websocket: WebSocket, session_id: str):
 
 class AudioProcessor:
     """
-    Process audio data from browser using Streaming ASR.
+    Process audio data from browser using local ASR.
 
-    Uses Doubao Streaming ASR with WebSocket for real-time recognition.
-    Maintains a streaming ASR connection per session.
+    NOTE: ASR engine implementation pending.
+    FunASR Paraformer will be integrated for streaming recognition.
+    Maintains an ASR engine instance per session.
     """
-
-    MAX_RETRIES = 3  # 最大重试次数
 
     def __init__(self) -> None:
         """Initialize audio processor."""
         self._asr_engines: Dict[str, Any] = {}
         self._lock = asyncio.Lock()
-        self._accumulated_text: Dict[str, str] = {}
-        self._failed_sessions: Dict[str, int] = {}  # 失败计数
 
     async def get_asr_engine(self, session_id: str) -> Any:
-        """Get or create streaming ASR engine for session."""
+        """Get or create ASR engine for session."""
         async with self._lock:
-            # 检查是否已超过重试限制
-            fail_count = self._failed_sessions.get(session_id, 0)
-            if fail_count >= self.MAX_RETRIES:
-                return None  # 停止重试
-
             if session_id not in self._asr_engines:
-                try:
-                    from ...perception.doubao_streaming_asr import DoubaoStreamingASR
-                    asr = DoubaoStreamingASR()
-                    connected = await asr.connect()
-                    if connected:
-                        self._asr_engines[session_id] = asr
-                        self._accumulated_text[session_id] = ""
-                        self._failed_sessions.pop(session_id, None)  # 清除失败计数
-                        print(f"[ASR] Connected streaming ASR for session {session_id}")
-                    else:
-                        self._failed_sessions[session_id] = fail_count + 1
-                        print(f"[ASR] Failed to connect ({fail_count + 1}/{self.MAX_RETRIES}) for session {session_id}")
-                        return None
-                except ImportError as e:
-                    print(f"[ASR] Import error: {e}, falling back to HybridASR")
-                    from ...perception.hybrid_asr import HybridASR
-                    self._asr_engines[session_id] = HybridASR(prefer_online=True)
-                except Exception as e:
-                    self._failed_sessions[session_id] = fail_count + 1
-                    print(f"[ASR] Error ({fail_count + 1}/{self.MAX_RETRIES}): {e}")
-                    return None
+                # TODO: Implement FunASR Paraformer integration
+                print(f"[ASR] ASR engine not implemented yet for session {session_id}")
+                return None
             return self._asr_engines[session_id]
 
     async def process_audio(
@@ -643,94 +617,27 @@ class AudioProcessor:
         Returns:
             ASR result as dict, or None if processing failed
         """
-        try:
-            # Get ASR engine for this session
-            asr_engine = await self.get_asr_engine(session_id)
-            if asr_engine is None:
-                return None
-
-            # Check if it's streaming ASR (new implementation)
-            if hasattr(asr_engine, 'send_audio') and hasattr(asr_engine, 'receive_result'):
-                # Streaming ASR - send audio and try to receive result
-                await asr_engine.send_audio(audio_data)
-
-                # Try to receive result (non-blocking)
-                result = await asr_engine.receive_result(timeout=0.1)
-
-                if result and result.text:
-                    # Update accumulated text
-                    if session_id in self._accumulated_text:
-                        self._accumulated_text[session_id] = result.text
-
-                    return {
-                        "session_id": session_id,
-                        "timestamp": time.time(),
-                        "text": result.text,
-                        "confidence": result.confidence,
-                        "language": "zh",
-                        "is_final": result.is_final,
-                        "segments": [],
-                    }
-                return None
-
-            else:
-                # Fallback: old sync ASR (HybridASR)
-                audio_array = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
-                result = asr_engine.transcribe(audio_array, sample_rate=sample_rate)
-
-                if result.text:
-                    return {
-                        "session_id": session_id,
-                        "timestamp": time.time(),
-                        "text": result.text,
-                        "confidence": result.confidence,
-                        "language": result.language.value if result.language else "unknown",
-                        "segments": [
-                            {
-                                "text": seg.text,
-                                "start_time": seg.start_time,
-                                "end_time": seg.end_time,
-                                "confidence": seg.confidence,
-                            }
-                            for seg in result.segments
-                        ] if result.segments else [],
-                    }
-                return None
-
-        except Exception as e:
-            print(f"[ASR] Audio processing error: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
+        # TODO: Implement FunASR Paraformer integration
+        print(f"[ASR] Audio processing not implemented yet")
+        return None
 
     async def cleanup_session(self, session_id: str) -> None:
         """Release resources for a session."""
         async with self._lock:
             if session_id in self._asr_engines:
                 engine = self._asr_engines[session_id]
-                # Streaming ASR cleanup
-                if hasattr(engine, 'disconnect'):
-                    await engine.disconnect()
-                elif hasattr(engine, 'release'):
+                if hasattr(engine, 'release'):
                     engine.release()
                 del self._asr_engines[session_id]
-            if session_id in self._accumulated_text:
-                del self._accumulated_text[session_id]
-            if session_id in self._failed_sessions:
-                del self._failed_sessions[session_id]
             print(f"[ASR] Cleaned up session {session_id}")
 
     async def cleanup_all(self) -> None:
         """Release all ASR resources."""
         async with self._lock:
-            for session_id, engine in list(self._asr_engines.items()):
-                if hasattr(engine, 'disconnect'):
-                    await engine.disconnect()
-                elif hasattr(engine, 'release'):
+            for engine in self._asr_engines.values():
+                if hasattr(engine, 'release'):
                     engine.release()
             self._asr_engines.clear()
-            self._accumulated_text.clear()
-            self._failed_sessions.clear()
 
 
 # Global audio processor

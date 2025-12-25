@@ -12,11 +12,11 @@ Pose Detection:
 
 Speech Recognition:
     - ASREngine: Abstract base class for ASR engines
-    - WhisperASR: OpenAI Whisper-based local ASR (offline)
-    - DoubaoASR: Volcengine Doubao API (online)
-    - HybridASR: Smart switcher with auto fallback
     - ASRResult: Result container for transcription
     - ASRSegment: Single transcribed segment
+
+Note:
+    后续将添加 FunASR Paraformer 支持本地高精度流式识别。
 
 Usage:
     from src.perception import MediaPipePose, PoseResult
@@ -27,13 +27,11 @@ Usage:
             for landmark in result.landmarks:
                 print(f"({landmark.x:.3f}, {landmark.y:.3f})")
 
-    # Smart ASR with auto fallback (online -> offline)
-    from src.perception import HybridASR
-
-    with HybridASR() as asr:
-        result = asr.transcribe(audio_data)
-        print(f"Mode: {asr.current_mode}")
-        print(f"Text: {result.text}")
+    # ASR usage (FunASR implementation planned)
+    # from src.perception import FunASREngine
+    # with FunASREngine() as asr:
+    #     result = asr.transcribe(audio_data)
+    #     print(f"Text: {result.text}")
 """
 
 from .asr_engine import (
@@ -44,8 +42,6 @@ from .asr_engine import (
     ASRStatus,
     STANDARD_TERMINOLOGY,
 )
-from .doubao_asr import DoubaoASR, DoubaoConfig, MockDoubaoASR
-from .hybrid_asr import ASRMode, HybridASR, MockHybridASR
 from .mediapipe_pose import MediaPipePose
 from .pose_detector import (
     BodyPart,
@@ -56,7 +52,6 @@ from .pose_detector import (
     PoseResult,
     PoseType,
 )
-from .whisper_asr import MockWhisperASR, WhisperASR
 
 __all__ = [
     # Pose Detection - Base classes
@@ -76,15 +71,4 @@ __all__ = [
     "ASRLanguage",
     "ASRStatus",
     "STANDARD_TERMINOLOGY",
-    # ASR - Whisper (offline)
-    "WhisperASR",
-    "MockWhisperASR",
-    # ASR - Doubao (online)
-    "DoubaoASR",
-    "DoubaoConfig",
-    "MockDoubaoASR",
-    # ASR - Hybrid (auto switch)
-    "HybridASR",
-    "MockHybridASR",
-    "ASRMode",
 ]

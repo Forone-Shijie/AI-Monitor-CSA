@@ -112,7 +112,8 @@
 | 后端框架 | Python 3.10+, FastAPI |
 | 姿态检测 | MediaPipe Pose (33关键点) |
 | 动作识别 | ST-GCN + LSTM |
-| 语音识别 | 豆包 ASR API / Whisper (双模式) |
+| 语音识别 | FunASR Paraformer (规划中) |
+| AI分析报告 | Ollama + Qwen2.5 (规划中) |
 | 数据库 | PostgreSQL + Redis |
 | 前端框架 | Vue 3 + TypeScript, Vite |
 | UI组件库 | Element Plus |
@@ -122,21 +123,29 @@
 
 ## 开发状态
 
-**当前阶段**: Phase 0 - 项目初始化
+**当前阶段**: Phase 10 - 本地AI部署
 
 | 阶段 | 目标 | 状态 |
 |------|------|------|
-| Phase 0 | 项目初始化 | 进行中 |
-| Phase 1 | 视频输入层 | 待开始 |
-| Phase 2 | 姿态检测（含防冲击姿势） | 待开始 |
-| Phase 3 | 动作识别 | 待开始 |
-| Phase 4 | 语音识别 | 待开始 |
-| Phase 5 | SOP分析（含场景触发） | 待开始 |
-| Phase 6 | 评估引擎 | 待开始 |
-| Phase 7 | 后端API | 待开始 |
-| Phase 8 | 前端开发 | 待开始 |
-| Phase 9 | 系统集成 | 待开始 |
-| Phase 10 | 部署交付 | 待开始 |
+| Phase 0 | 项目初始化 | ✅ 完成 |
+| Phase 1 | 视频输入层 | ✅ 完成 |
+| Phase 2 | 姿态检测（含防冲击姿势） | ✅ 完成 |
+| Phase 3 | 动作识别 | 暂缓 |
+| Phase 4 | 语音识别 | ✅ 完成 |
+| Phase 5 | SOP分析（含场景触发） | ✅ 完成 |
+| Phase 6 | 评估引擎 | ✅ 完成 |
+| Phase 7 | 后端API | ✅ 完成 |
+| Phase 8 | 前端开发 | ✅ 完成 |
+| Phase 9 | 系统集成 | ✅ 完成 |
+| Phase 10 | 本地AI部署 | 进行中 |
+
+### Phase 10 本地AI升级计划
+
+- **10A**: FunASR Paraformer 流式语音识别集成
+- **10B**: Ollama + Qwen2.5 本地LLM报告生成
+- **10C**: Docker容器化部署
+
+详见 [本地AI开发计划](docs/DEVELOPMENT_PLAN_LOCAL_AI.md)
 
 ---
 
@@ -237,17 +246,25 @@ system:
   language: "zh"
 
 asr:
-  model: whisper-small
-  language: zh
+  default_engine: "funasr"  # funasr (规划中)
+  funasr:
+    model: "paraformer-zh-streaming"
+    vad_model: "fsmn-vad"
+    punc_model: "ct-punc"
+    device: "cuda"
 
 pose:
-  model: mediapipe
-  confidence_threshold: 0.5
+  engine: "mediapipe"
+  min_detection_confidence: 0.5
 
 evaluation:
-  pose_weight: 0.3
-  action_weight: 0.4
-  communication_weight: 0.3
+  weights:
+    pose: 0.30
+    action: 0.40
+    communication: 0.30
+  llm:
+    model: "qwen2.5:7b"
+    base_url: "http://localhost:11434"
 ```
 
 SOP规则文件: `backend/config/sop_rules.yaml`

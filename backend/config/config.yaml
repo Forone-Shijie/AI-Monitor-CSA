@@ -68,22 +68,16 @@ brace_position:
 
 # === ASR Settings ===
 asr:
-  # Default engine: api (Doubao) or local (Whisper)
-  default_engine: "api"
+  # Default engine: funasr (to be implemented)
+  default_engine: "funasr"
 
-  # Doubao API Settings (P1 Priority)
-  doubao:
-    api_key: ""  # Set via environment variable: DOUBAO_API_KEY
-    base_url: "https://openspeech.bytedance.com/api/v1/asr"
-    language: "zh"
+  # FunASR Paraformer Settings (to be implemented)
+  funasr:
+    model: "paraformer-zh-streaming"
+    vad_model: "fsmn-vad"
+    punc_model: "ct-punc"
+    device: "cuda"
     sample_rate: 16000
-
-  # Whisper Local Settings (P2 Later)
-  whisper:
-    model_size: "small"  # tiny, base, small, medium, large
-    language: "zh"
-    device: "cuda"  # cuda or cpu
-    compute_type: "float16"
 
 # === Evaluation Settings ===
 evaluation:

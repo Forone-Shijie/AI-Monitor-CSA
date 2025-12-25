@@ -394,7 +394,7 @@ class TestSynchronizer:
         synchronizer.add_asr(
             timestamp=1.0,
             asr_result={"text": "hello world"},
-            source="whisper",
+            source="asr",
             confidence=0.9,
         )
 
