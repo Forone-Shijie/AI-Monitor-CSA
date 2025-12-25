@@ -162,6 +162,12 @@ export function captureVideoFrame(
   quality: number = 0.8
 ): Promise<Blob | null> {
   return new Promise((resolve) => {
+    // Check if video dimensions are valid
+    if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
+      resolve(null)
+      return
+    }
+
     const canvas = document.createElement('canvas')
     canvas.width = videoElement.videoWidth
     canvas.height = videoElement.videoHeight

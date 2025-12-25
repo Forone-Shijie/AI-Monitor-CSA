@@ -134,7 +134,7 @@ onMounted(loadReports)
               :key="report.report_id"
               class="report-item"
               :class="{ 'report-item--active': selectedReportId === report.report_id }"
-              @click="selectReport(report.report_id)"
+              @click="selectReport(report.session_id)"
             >
               <div class="report-main">
                 <span class="report-trainee">{{ report.trainee_name }}</span>

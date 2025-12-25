@@ -148,6 +148,8 @@ show_status() {
     echo -e "  后端 API: ${CYAN}http://localhost:8000${NC}"
     echo -e "  API 文档: ${CYAN}http://localhost:8000/docs${NC}"
     echo ""
+    echo -e "  日志文件: ${CYAN}$BACKEND_DIR/logs/latest.log${NC}"
+    echo ""
     echo -e "  按 ${YELLOW}Ctrl+C${NC} 停止所有服务"
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"

@@ -8,6 +8,20 @@ Creates and configures the FastAPI application with:
 - Documentation
 """
 
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env before any other imports that might need env vars
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(env_path)
+
+# Initialize logging
+from src.utils.logging_config import setup_logging, get_logger
+
+setup_logging()
+logger = get_logger(__name__)
+
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -22,10 +36,10 @@ from .session_manager import session_manager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
     """Application lifespan handler."""
     # Startup
-    print("CC-SOP Monitor API starting...")
+    logger.info("CC-SOP Monitor API starting...")
     yield
     # Shutdown
-    print("CC-SOP Monitor API shutting down...")
+    logger.info("CC-SOP Monitor API shutting down...")
     session_manager.clear_all()
 
 

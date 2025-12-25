@@ -5,6 +5,15 @@ Cabin Crew Standard Operating Procedure Monitor - AI Training Evaluation System
 For China Southern Airlines
 """
 
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
+
 import uvicorn
 
 # Import the configured FastAPI application from api module

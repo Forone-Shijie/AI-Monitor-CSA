@@ -195,6 +195,9 @@ async def list_reports(
         session_data = session_manager.get_session_data(session.session_id)
         if session_data and session_data.report:
             report = session_data.report
+            # Extract nested data from TrainingReport.to_dict() format
+            session_info = report.get("session", {})
+            scores = report.get("scores", {})
             reports.append(
                 ReportData(
                     report_id=report.get("report_id", ""),
@@ -204,13 +207,13 @@ async def list_reports(
                     trainee_name=session.trainee_name,
                     scenario_id=session.scenario_id,
                     scenario_name=session.scenario_name,
-                    session_date=report.get("session_date", ""),
-                    duration_seconds=session.duration_seconds,
-                    total_score=report.get("total_score", 0),
-                    grade=report.get("grade", ""),
-                    pose_score=report.get("pose_score", 0),
-                    action_score=report.get("action_score", 0),
-                    communication_score=report.get("communication_score", 0),
+                    session_date=session_info.get("date", ""),
+                    duration_seconds=session_info.get("duration_seconds", session.duration_seconds),
+                    total_score=scores.get("total", 0),
+                    grade=scores.get("grade", ""),
+                    pose_score=scores.get("pose", 0),
+                    action_score=scores.get("action", 0),
+                    communication_score=scores.get("communication", 0),
                     suggestions=[
                         SuggestionData(**s) for s in report.get("suggestions", [])
                     ],
@@ -251,6 +254,10 @@ async def get_report(session_id: str) -> ReportResponse:
     report = session_data.report
     session = session_data.to_info()
 
+    # Extract nested data from TrainingReport.to_dict() format
+    session_info = report.get("session", {})
+    scores = report.get("scores", {})
+
     data = ReportData(
         report_id=report.get("report_id", ""),
         generated_at=report.get("generated_at", ""),
@@ -259,13 +266,13 @@ async def get_report(session_id: str) -> ReportResponse:
         trainee_name=session.trainee_name,
         scenario_id=session.scenario_id,
         scenario_name=session.scenario_name,
-        session_date=report.get("session_date", ""),
-        duration_seconds=session.duration_seconds,
-        total_score=report.get("total_score", 0),
-        grade=report.get("grade", ""),
-        pose_score=report.get("pose_score", 0),
-        action_score=report.get("action_score", 0),
-        communication_score=report.get("communication_score", 0),
+        session_date=session_info.get("date", ""),
+        duration_seconds=session_info.get("duration_seconds", session.duration_seconds),
+        total_score=scores.get("total", 0),
+        grade=scores.get("grade", ""),
+        pose_score=scores.get("pose", 0),
+        action_score=scores.get("action", 0),
+        communication_score=scores.get("communication", 0),
         suggestions=[
             SuggestionData(**s) for s in report.get("suggestions", [])
         ],

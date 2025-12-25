@@ -404,3 +404,181 @@ export class StreamingWebSocketClient {
 
 // Singleton instance for streaming
 export const streamingClient = new StreamingWebSocketClient()
+
+
+/**
+ * Audio Streaming WebSocket Client for sending audio data to backend
+ *
+ * Connects to /ws/audio/{session_id} endpoint for ASR processing.
+ */
+export interface ASRResult {
+  session_id: string
+  timestamp: number
+  text: string
+  confidence: number
+  language: string
+  segments: Array<{
+    text: string
+    start_time: number
+    end_time: number
+    confidence: number
+  }>
+}
+
+export class AudioStreamingWebSocketClient {
+  private ws: WebSocket | null = null
+  private sessionId: string | null = null
+  private reconnectAttempts = 0
+  private maxReconnectAttempts = 3
+  private autoReconnect = true
+
+  // Event handlers
+  private onResultHandlers: ((result: ASRResult) => void)[] = []
+  private onConnectHandlers: (() => void)[] = []
+  private onDisconnectHandlers: (() => void)[] = []
+  private onErrorHandlers: ((error: Event | Error) => void)[] = []
+
+  get isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN
+  }
+
+  get currentSessionId(): string | null {
+    return this.sessionId
+  }
+
+  /**
+   * Connect to audio streaming WebSocket for a session
+   */
+  connect(sessionId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        if (this.sessionId === sessionId) {
+          resolve()
+          return
+        }
+        this.disconnect()
+      }
+
+      this.sessionId = sessionId
+      const url = `${WS_BASE_URL}/api/ws/audio/${sessionId}`
+
+      try {
+        this.ws = new WebSocket(url)
+
+        this.ws.onopen = () => {
+          console.log(`Audio WebSocket connected to session: ${sessionId}`)
+          this.reconnectAttempts = 0
+          this.onConnectHandlers.forEach(handler => handler())
+          resolve()
+        }
+
+        this.ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data)
+            if (message.type === 'asr_result') {
+              this.onResultHandlers.forEach(handler => handler(message.data as ASRResult))
+            }
+          } catch (error) {
+            console.error('Failed to parse audio message:', error)
+          }
+        }
+
+        this.ws.onerror = (error) => {
+          console.error('Audio WebSocket error:', error)
+          this.onErrorHandlers.forEach(handler => handler(error))
+          reject(error)
+        }
+
+        this.ws.onclose = () => {
+          console.log('Audio WebSocket disconnected')
+          this.onDisconnectHandlers.forEach(handler => handler())
+          this.attemptReconnect()
+        }
+      } catch (error) {
+        reject(error)
+      }
+    })
+  }
+
+  /**
+   * Disconnect from audio WebSocket
+   */
+  disconnect(): void {
+    this.autoReconnect = false
+    if (this.ws) {
+      this.ws.close()
+      this.ws = null
+    }
+    this.sessionId = null
+    this.reconnectAttempts = 0
+  }
+
+  /**
+   * Send PCM audio data to the server for ASR processing
+   */
+  sendAudio(audioData: ArrayBuffer | Int16Array): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      if (audioData instanceof Int16Array) {
+        this.ws.send(audioData.buffer)
+      } else {
+        this.ws.send(audioData)
+      }
+    } else {
+      console.warn('Audio WebSocket is not connected, cannot send audio')
+    }
+  }
+
+  /**
+   * Attempt to reconnect
+   */
+  private attemptReconnect(): void {
+    if (!this.autoReconnect || !this.sessionId) return
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('Max audio reconnect attempts reached')
+      return
+    }
+
+    this.reconnectAttempts++
+    const delay = 1000 * Math.pow(2, this.reconnectAttempts - 1)
+
+    console.log(`Audio reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`)
+
+    setTimeout(() => {
+      if (this.sessionId) {
+        this.connect(this.sessionId).catch(console.error)
+      }
+    }, delay)
+  }
+
+  // Event handler registration
+  onResult(handler: (result: ASRResult) => void): () => void {
+    this.onResultHandlers.push(handler)
+    return () => {
+      this.onResultHandlers = this.onResultHandlers.filter(h => h !== handler)
+    }
+  }
+
+  onConnect(handler: () => void): () => void {
+    this.onConnectHandlers.push(handler)
+    return () => {
+      this.onConnectHandlers = this.onConnectHandlers.filter(h => h !== handler)
+    }
+  }
+
+  onDisconnect(handler: () => void): () => void {
+    this.onDisconnectHandlers.push(handler)
+    return () => {
+      this.onDisconnectHandlers = this.onDisconnectHandlers.filter(h => h !== handler)
+    }
+  }
+
+  onError(handler: (error: Event | Error) => void): () => void {
+    this.onErrorHandlers.push(handler)
+    return () => {
+      this.onErrorHandlers = this.onErrorHandlers.filter(h => h !== handler)
+    }
+  }
+}
+
+// Singleton instance for audio streaming
+export const audioStreamingClient = new AudioStreamingWebSocketClient()

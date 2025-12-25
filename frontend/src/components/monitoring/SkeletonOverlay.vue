@@ -59,10 +59,11 @@ function getKeypointXY(kp: number[] | undefined): { x: number; y: number } | nul
 }
 
 // Helper to check keypoint visibility
+// MediaPipe keypoints: [x, y, z, visibility] - visibility is at index 3
 function isKeypointVisible(kp: number[] | undefined, threshold = 0.5): boolean {
-  if (!kp || kp.length < 3) return false
-  const confidence = kp[2]
-  return confidence !== undefined && confidence > threshold
+  if (!kp || kp.length < 4) return false
+  const visibility = kp[3]  // visibility is the 4th element, not z (which is at index 2)
+  return visibility !== undefined && visibility > threshold
 }
 
 const angleLabels = computed(() => {
@@ -210,5 +211,6 @@ onMounted(() => {
   top: 0;
   left: 0;
   pointer-events: none;
+  z-index: 3;
 }
 </style>

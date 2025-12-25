@@ -10,6 +10,7 @@ Endpoints:
 - DELETE /sessions/{id} - Delete session
 """
 
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -27,6 +28,8 @@ from ..schemas import (
 )
 from ..session_manager import session_manager
 from ..monitoring_service import monitoring_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
@@ -275,13 +278,71 @@ async def stop_session(
             detail=f"Cannot stop session in {session.status} status",
         )
 
+    # Generate report if requested
+    if generate_report:
+        try:
+            await _generate_session_report(session_id)
+        except Exception as e:
+            logger.error(f"Failed to generate report for session {session_id}: {e}")
+            # Don't fail the stop request if report generation fails
+
     session = session_manager.get_session(session_id)
 
     return SessionResponse(
         success=True,
-        message="Monitoring stopped",
+        message="Monitoring stopped" + (" and report generated" if generate_report else ""),
         data=session,
     )
+
+
+async def _generate_session_report(session_id: str) -> None:
+    """Generate evaluation and report for a completed session."""
+    from src.evaluation.evaluator import Evaluator, EvaluationResult
+    from src.evaluation.report_generator import ReportGenerator
+
+    session_data = session_manager.get_session_data(session_id)
+    if not session_data:
+        raise ValueError(f"Session {session_id} not found")
+
+    # Calculate duration
+    duration_seconds = 0.0
+    if session_data.started_at and session_data.ended_at:
+        duration_seconds = (session_data.ended_at - session_data.started_at).total_seconds()
+
+    # Create evaluator and evaluate session
+    evaluator = Evaluator()
+
+    # Get the latest pose data for evaluation
+    pose_data = session_data.pose_history[-1] if session_data.pose_history else None
+    brace_result = session_data.brace_history[-1] if session_data.brace_history else None
+
+    eval_result = evaluator.evaluate(
+        session_id=session_id,
+        scenario_id=session_data.scenario_id,
+        scenario_name=session_data.scenario_name,
+        pose_data=pose_data,
+        pose_history=session_data.pose_history,
+        brace_result=brace_result,
+    )
+
+    # Store evaluation result
+    session_manager.set_evaluation_result(session_id, eval_result.to_dict())
+
+    # Generate report
+    generator = ReportGenerator()
+    report = generator.generate(
+        evaluation=eval_result,
+        trainee_id=session_data.trainee_id,
+        trainee_name=session_data.trainee_name,
+        session_date=session_data.created_at.strftime("%Y-%m-%d"),
+        duration_seconds=duration_seconds,
+        include_ai_suggestions=True,
+    )
+
+    # Store report
+    session_manager.set_report(session_id, report.to_dict())
+
+    logger.info(f"Generated report for session {session_id}: score={eval_result.total_score}, grade={eval_result.grade}")
 
 
 @router.post(
