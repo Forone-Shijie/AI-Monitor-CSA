@@ -218,11 +218,9 @@ async def get_asr_modes() -> Dict:
         "success": True,
         "message": "ASR modes retrieved",
         "data": {
-            "current": _config.asr_mode,
+            "current": "online",
             "available": [
-                {"id": "auto", "name": "自动", "description": "在线优先，离线备份"},
-                {"id": "online", "name": "在线", "description": "仅使用豆包API"},
-                {"id": "offline", "name": "离线", "description": "仅使用本地Whisper"},
+                {"id": "online", "name": "在线", "description": "豆包大模型流式语音识别 (bigmodel_async)"},
             ],
         },
     }
@@ -231,23 +229,19 @@ async def get_asr_modes() -> Dict:
 @router.put(
     "/asr-mode",
     summary="Set ASR mode",
-    description="Set ASR operation mode",
+    description="Set ASR operation mode (currently only online mode is supported)",
 )
 async def set_asr_mode(mode: str) -> Dict:
     """Set ASR mode."""
-    global _config
-
-    if mode not in ["auto", "online", "offline"]:
+    if mode != "online":
         raise HTTPException(
             status_code=400,
-            detail="Invalid mode. Must be 'auto', 'online', or 'offline'",
+            detail="Only 'online' mode is supported",
         )
-
-    _config.asr_mode = mode
 
     return {
         "success": True,
-        "message": f"ASR mode set to {mode}",
+        "message": f"ASR mode: {mode}",
         "data": {"mode": mode},
     }
 

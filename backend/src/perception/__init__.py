@@ -12,9 +12,8 @@ Pose Detection:
 
 Speech Recognition:
     - ASREngine: Abstract base class for ASR engines
-    - WhisperASR: OpenAI Whisper-based local ASR (offline)
-    - DoubaoASR: Volcengine Doubao API (online)
-    - HybridASR: Smart switcher with auto fallback
+    - DoubaoASREngine: Volcengine Doubao streaming ASR (bigmodel_async)
+    - DoubaoStreamingSession: Session manager for streaming recognition
     - ASRResult: Result container for transcription
     - ASRSegment: Single transcribed segment
 
@@ -27,13 +26,13 @@ Usage:
             for landmark in result.landmarks:
                 print(f"({landmark.x:.3f}, {landmark.y:.3f})")
 
-    # Smart ASR with auto fallback (online -> offline)
-    from src.perception import HybridASR
+    # Streaming ASR
+    from src.perception import DoubaoStreamingSession
 
-    with HybridASR() as asr:
-        result = asr.transcribe(audio_data)
-        print(f"Mode: {asr.current_mode}")
-        print(f"Text: {result.text}")
+    session = DoubaoStreamingSession()
+    await session.start()
+    await session.send_audio(audio_data)
+    text = session.get_current_text()
 """
 
 from .asr_engine import (
@@ -44,8 +43,12 @@ from .asr_engine import (
     ASRStatus,
     STANDARD_TERMINOLOGY,
 )
-from .doubao_asr import DoubaoASR, DoubaoConfig, MockDoubaoASR
-from .hybrid_asr import ASRMode, HybridASR, MockHybridASR
+from .doubao_asr_engine import (
+    DoubaoASREngine,
+    DoubaoConfig,
+    DoubaoResponse,
+    DoubaoStreamingSession,
+)
 from .mediapipe_pose import MediaPipePose
 from .pose_detector import (
     BodyPart,
@@ -56,7 +59,6 @@ from .pose_detector import (
     PoseResult,
     PoseType,
 )
-from .whisper_asr import MockWhisperASR, WhisperASR
 
 __all__ = [
     # Pose Detection - Base classes
@@ -76,15 +78,9 @@ __all__ = [
     "ASRLanguage",
     "ASRStatus",
     "STANDARD_TERMINOLOGY",
-    # ASR - Whisper (offline)
-    "WhisperASR",
-    "MockWhisperASR",
-    # ASR - Doubao (online)
-    "DoubaoASR",
+    # ASR - Doubao Streaming (bigmodel_async)
+    "DoubaoASREngine",
     "DoubaoConfig",
-    "MockDoubaoASR",
-    # ASR - Hybrid (auto switch)
-    "HybridASR",
-    "MockHybridASR",
-    "ASRMode",
+    "DoubaoResponse",
+    "DoubaoStreamingSession",
 ]

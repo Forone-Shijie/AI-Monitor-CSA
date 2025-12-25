@@ -579,158 +579,141 @@ async def websocket_stream(websocket: WebSocket, session_id: str):
 
 class AudioProcessor:
     """
-    Process audio data from browser using Streaming ASR.
+    Process audio data from browser using Doubao Streaming ASR (bigmodel_async).
 
-    Uses Doubao Streaming ASR with WebSocket for real-time recognition.
-    Maintains a streaming ASR connection per session.
+    使用火山引擎豆包大模型进行流式语音识别。
+    适配 bigmodel_async 优化模式：发送和接收完全解耦。
     """
-
-    MAX_RETRIES = 3  # 最大重试次数
 
     def __init__(self) -> None:
         """Initialize audio processor."""
-        self._asr_engines: Dict[str, Any] = {}
+        from ...perception.doubao_asr_engine import DoubaoConfig
+
+        self._sessions: Dict[str, Any] = {}  # session_id -> DoubaoStreamingSession
+        self._result_callbacks: Dict[str, Any] = {}  # session_id -> callback
         self._lock = asyncio.Lock()
-        self._accumulated_text: Dict[str, str] = {}
-        self._failed_sessions: Dict[str, int] = {}  # 失败计数
+        self._config = DoubaoConfig()
 
-    async def get_asr_engine(self, session_id: str) -> Any:
-        """Get or create streaming ASR engine for session."""
-        async with self._lock:
-            # 检查是否已超过重试限制
-            fail_count = self._failed_sessions.get(session_id, 0)
-            if fail_count >= self.MAX_RETRIES:
-                return None  # 停止重试
+        # 检查配置
+        if self._config.validate():
+            print("[ASR] DoubaoASR configured (bigmodel_async mode)")
+        else:
+            print("[ASR] DoubaoASR config incomplete, check DOUBAO_APP_ID and DOUBAO_ACCESS_TOKEN")
 
-            if session_id not in self._asr_engines:
-                try:
-                    from ...perception.doubao_streaming_asr import DoubaoStreamingASR
-                    asr = DoubaoStreamingASR()
-                    connected = await asr.connect()
-                    if connected:
-                        self._asr_engines[session_id] = asr
-                        self._accumulated_text[session_id] = ""
-                        self._failed_sessions.pop(session_id, None)  # 清除失败计数
-                        print(f"[ASR] Connected streaming ASR for session {session_id}")
-                    else:
-                        self._failed_sessions[session_id] = fail_count + 1
-                        print(f"[ASR] Failed to connect ({fail_count + 1}/{self.MAX_RETRIES}) for session {session_id}")
-                        return None
-                except ImportError as e:
-                    print(f"[ASR] Import error: {e}, falling back to HybridASR")
-                    from ...perception.hybrid_asr import HybridASR
-                    self._asr_engines[session_id] = HybridASR(prefer_online=True)
-                except Exception as e:
-                    self._failed_sessions[session_id] = fail_count + 1
-                    print(f"[ASR] Error ({fail_count + 1}/{self.MAX_RETRIES}): {e}")
-                    return None
-            return self._asr_engines[session_id]
-
-    async def process_audio(
+    async def start_session(
         self,
         session_id: str,
-        audio_data: bytes,
-        sample_rate: int = 16000,
-    ) -> Optional[Dict[str, Any]]:
+        on_result: Optional[Any] = None,
+    ) -> bool:
         """
-        Process audio data and return ASR results.
+        Start ASR session for audio processing.
 
         Args:
             session_id: Session identifier
-            audio_data: PCM audio bytes (16-bit, mono)
-            sample_rate: Audio sample rate
+            on_result: Callback function (text, is_final) -> None
 
         Returns:
-            ASR result as dict, or None if processing failed
+            True if session started successfully
         """
-        try:
-            # Get ASR engine for this session
-            asr_engine = await self.get_asr_engine(session_id)
-            if asr_engine is None:
-                return None
+        from ...perception.doubao_asr_engine import DoubaoStreamingSession
 
-            # Check if it's streaming ASR (new implementation)
-            if hasattr(asr_engine, 'send_audio') and hasattr(asr_engine, 'receive_result'):
-                # Streaming ASR - send audio and try to receive result
-                await asr_engine.send_audio(audio_data)
+        async with self._lock:
+            if session_id in self._sessions:
+                return True
 
-                # Try to receive result (non-blocking)
-                result = await asr_engine.receive_result(timeout=0.1)
+            if not self._config.validate():
+                print(f"[ASR] Cannot create session: config invalid")
+                return False
 
-                if result and result.text:
-                    # Update accumulated text
-                    if session_id in self._accumulated_text:
-                        self._accumulated_text[session_id] = result.text
-
-                    return {
-                        "session_id": session_id,
-                        "timestamp": time.time(),
-                        "text": result.text,
-                        "confidence": result.confidence,
-                        "language": "zh",
-                        "is_final": result.is_final,
-                        "segments": [],
-                    }
-                return None
-
+            session = DoubaoStreamingSession(self._config, on_result=on_result)
+            if await session.start():
+                self._sessions[session_id] = session
+                self._result_callbacks[session_id] = on_result
+                print(f"[ASR] Started streaming session for {session_id}")
+                return True
             else:
-                # Fallback: old sync ASR (HybridASR)
-                audio_array = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
-                result = asr_engine.transcribe(audio_array, sample_rate=sample_rate)
+                print(f"[ASR] Failed to start streaming session for {session_id}")
+                return False
 
-                if result.text:
-                    return {
-                        "session_id": session_id,
-                        "timestamp": time.time(),
-                        "text": result.text,
-                        "confidence": result.confidence,
-                        "language": result.language.value if result.language else "unknown",
-                        "segments": [
-                            {
-                                "text": seg.text,
-                                "start_time": seg.start_time,
-                                "end_time": seg.end_time,
-                                "confidence": seg.confidence,
-                            }
-                            for seg in result.segments
-                        ] if result.segments else [],
-                    }
-                return None
+    async def send_audio(
+        self,
+        session_id: str,
+        audio_data: bytes,
+        is_last: bool = False,
+    ) -> bool:
+        """
+        Send audio data to ASR.
 
+        Args:
+            session_id: Session identifier
+            audio_data: PCM audio bytes (16-bit, mono, 16kHz)
+            is_last: Whether this is the last audio chunk
+
+        Returns:
+            True if sent successfully
+        """
+        session = self._sessions.get(session_id)
+        if not session:
+            if not await self.start_session(session_id):
+                return False
+            session = self._sessions.get(session_id)
+
+        if not session:
+            return False
+
+        try:
+            await session.send_audio(audio_data, is_last=is_last)
+            return True
         except Exception as e:
-            print(f"[ASR] Audio processing error: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"[ASR] Error sending audio: {e}")
+            return False
+
+    def get_current_text(self, session_id: str) -> str:
+        """Get current accumulated text (non-blocking)."""
+        session = self._sessions.get(session_id)
+        if session:
+            return session.get_current_text()
+        return ""
+
+    async def finalize_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Send last packet and wait for final result."""
+        session = self._sessions.get(session_id)
+        if not session:
             return None
 
-    async def cleanup_session(self, session_id: str) -> None:
+        try:
+            await session.send_audio(b"", is_last=True)
+
+            for _ in range(50):  # 最多等待5秒
+                if session.is_finished:
+                    break
+                await asyncio.sleep(0.1)
+
+            final_text = session.get_current_text()
+            return {"text": final_text, "is_final": True} if final_text else None
+        except Exception as e:
+            print(f"[ASR] Error finalizing session: {e}")
+            return None
+
+    async def cleanup_session(self, session_id: str) -> Optional[str]:
         """Release resources for a session."""
         async with self._lock:
-            if session_id in self._asr_engines:
-                engine = self._asr_engines[session_id]
-                # Streaming ASR cleanup
-                if hasattr(engine, 'disconnect'):
-                    await engine.disconnect()
-                elif hasattr(engine, 'release'):
-                    engine.release()
-                del self._asr_engines[session_id]
-            if session_id in self._accumulated_text:
-                del self._accumulated_text[session_id]
-            if session_id in self._failed_sessions:
-                del self._failed_sessions[session_id]
+            session = self._sessions.pop(session_id, None)
+            self._result_callbacks.pop(session_id, None)
+
+        if session:
+            final_text = await session.stop()
             print(f"[ASR] Cleaned up session {session_id}")
+            return final_text
+        return None
 
     async def cleanup_all(self) -> None:
         """Release all ASR resources."""
         async with self._lock:
-            for session_id, engine in list(self._asr_engines.items()):
-                if hasattr(engine, 'disconnect'):
-                    await engine.disconnect()
-                elif hasattr(engine, 'release'):
-                    engine.release()
-            self._asr_engines.clear()
-            self._accumulated_text.clear()
-            self._failed_sessions.clear()
+            for session in self._sessions.values():
+                await session.stop()
+            self._sessions.clear()
+            self._result_callbacks.clear()
 
 
 # Global audio processor
@@ -742,22 +725,19 @@ async def websocket_audio(websocket: WebSocket, session_id: str):
     """
     WebSocket endpoint for receiving audio data from browser.
 
-    Accepts binary WebSocket messages containing PCM audio data,
-    processes them through ASR, and returns transcription results.
+    适配 bigmodel_async 模式：发送和接收完全解耦。
 
     Protocol:
-    - Client sends: Binary (PCM 16-bit audio bytes)
-    - Server responds: JSON with ASR results
+    - Client sends: Binary (PCM 16-bit, mono, 16kHz audio bytes)
+    - Server responds: JSON with ASR results (when available)
 
     Response format:
     {
         "type": "asr_result",
         "data": {
             "session_id": "...",
-            "timestamp": 1234567890.123,
             "text": "识别的文字",
-            "confidence": 0.95,
-            "segments": [...]
+            "is_final": false
         }
     }
     """
@@ -770,15 +750,59 @@ async def websocket_audio(websocket: WebSocket, session_id: str):
     # Accept connection
     await websocket.accept()
 
+    # 结果发送队列
+    result_queue: asyncio.Queue = asyncio.Queue()
+
+    # 定义回调函数 - 当ASR有结果时调用
+    def on_asr_result(text: str, is_final: bool):
+        try:
+            result_queue.put_nowait({
+                "text": text,
+                "is_final": is_final,
+                "session_id": session_id,
+            })
+        except Exception:
+            pass
+
+    # 启动ASR会话
+    asr_started = await audio_processor.start_session(session_id, on_result=on_asr_result)
+
     # Send connection confirmation
     await websocket.send_json({
         "type": "connected",
         "data": {
             "session_id": session_id,
             "message": "Ready to receive audio data",
+            "asr_enabled": asr_started,
         },
         "timestamp": time.time(),
     })
+
+    # 结果发送任务
+    async def result_sender():
+        """独立任务：将ASR结果发送给客户端."""
+        try:
+            while True:
+                try:
+                    result = await asyncio.wait_for(result_queue.get(), timeout=0.5)
+                    await websocket.send_json({
+                        "type": "asr_result",
+                        "data": result,
+                        "timestamp": time.time(),
+                    })
+                    await ws_manager.broadcast(
+                        session_id,
+                        WSMessage(type="asr", data=result),
+                    )
+                except asyncio.TimeoutError:
+                    continue
+                except Exception:
+                    break
+        except asyncio.CancelledError:
+            pass
+
+    # 启动结果发送任务
+    sender_task = asyncio.create_task(result_sender())
 
     try:
         while True:
@@ -790,26 +814,9 @@ async def websocket_audio(websocket: WebSocket, session_id: str):
                 break
 
             if "bytes" in data:
-                # Process binary audio
+                # 发送音频数据 (fire and forget)
                 audio_data = data["bytes"]
-                result = await audio_processor.process_audio(session_id, audio_data)
-
-                if result:
-                    # Send ASR result
-                    await websocket.send_json({
-                        "type": "asr_result",
-                        "data": result,
-                        "timestamp": time.time(),
-                    })
-
-                    # Also broadcast to live subscribers
-                    await ws_manager.broadcast(
-                        session_id,
-                        WSMessage(
-                            type="asr",
-                            data=result,
-                        ),
-                    )
+                await audio_processor.send_audio(session_id, audio_data)
 
             elif "text" in data:
                 # Handle JSON commands
@@ -823,7 +830,21 @@ async def websocket_audio(websocket: WebSocket, session_id: str):
                             "timestamp": time.time(),
                         })
                     elif cmd == "stop":
+                        final_result = await audio_processor.finalize_session(session_id)
+                        if final_result:
+                            await websocket.send_json({
+                                "type": "asr_final",
+                                "data": final_result,
+                                "timestamp": time.time(),
+                            })
                         break
+                    elif cmd == "get_text":
+                        current_text = audio_processor.get_current_text(session_id)
+                        await websocket.send_json({
+                            "type": "asr_current",
+                            "data": {"text": current_text},
+                            "timestamp": time.time(),
+                        })
 
                 except json.JSONDecodeError:
                     await websocket.send_json({
@@ -835,5 +856,12 @@ async def websocket_audio(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         pass
     finally:
+        # 取消结果发送任务
+        sender_task.cancel()
+        try:
+            await sender_task
+        except asyncio.CancelledError:
+            pass
+
         # Cleanup ASR for this session
         await audio_processor.cleanup_session(session_id)

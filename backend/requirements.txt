@@ -29,7 +29,6 @@ soundfile>=0.12.0
 
 # === AI/ML ===
 torch>=2.0.0
-# openai-whisper>=20230918  # P2: Whisper local mode (install later)
 
 # === HTTP Client ===
 httpx>=0.24.0

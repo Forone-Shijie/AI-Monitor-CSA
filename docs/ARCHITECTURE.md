@@ -69,7 +69,7 @@
 │  ┌─────────────┐       ┌─────────────┐       ┌─────────────┐           │
 │  │  姿态检测   │       │  动作识别   │       │  语音识别   │           │
 │  │PoseDetector │       │ActionRecog  │       │    ASR      │           │
-│  │ MediaPipe   │       │ ST-GCN/CNN  │       │ 豆包/Whisper│           │
+│  │ MediaPipe   │       │ ST-GCN/CNN  │       │  豆包 ASR   │           │
 │  └──────┬──────┘       └──────┬──────┘       └──────┬──────┘           │
 │         │                     │                     │                   │
 │         └─────────────────────┼─────────────────────┘                   │
@@ -126,7 +126,7 @@
 | **后端框架** | FastAPI | Flask | 高性能异步API |
 | **姿态检测** | MediaPipe Pose | OpenPose | 实时性好，部署简单 |
 | **动作识别** | ST-GCN + LSTM | SlowFast | 基于骨骼的动作识别 |
-| **语音识别** | 豆包 ASR API | Whisper (本地) | 双模式：API优先开发，本地后续部署 |
+| **语音识别** | 豆包 ASR (bigmodel_async) | - | 火山引擎流式语音识别 |
 | **时序分析** | 自定义规则引擎 | - | 基于SOP标准库 |
 | **数据库** | PostgreSQL + Redis | - | 持久化 + 缓存 |
 | **前端框架** | Vue 3 + TypeScript | React | 企业推荐，Vite构建 |
@@ -404,8 +404,7 @@ AI-Monitor-CSA/
 │   │   │   ├── action_recognizer.py   # 动作识别基类
 │   │   │   ├── stgcn_recognizer.py    # ST-GCN实现
 │   │   │   ├── asr_engine.py          # ASR基类
-│   │   │   ├── doubao_asr.py          # 豆包API实现（优先）
-│   │   │   └── whisper_asr.py         # Whisper本地实现（后续）
+│   │   │   └── doubao_asr_engine.py   # 豆包流式ASR (bigmodel_async)
 │   │   │
 │   │   ├── analysis/                  # 分析层
 │   │   │   ├── synchronizer.py        # 多模态数据同步

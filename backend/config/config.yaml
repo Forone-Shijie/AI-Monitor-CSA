@@ -68,22 +68,17 @@ brace_position:
 
 # === ASR Settings ===
 asr:
-  # Default engine: api (Doubao) or local (Whisper)
-  default_engine: "api"
-
-  # Doubao API Settings (P1 Priority)
+  # Doubao Streaming ASR (bigmodel_async)
+  # Credentials set via environment variables: DOUBAO_APP_ID, DOUBAO_ACCESS_TOKEN
   doubao:
-    api_key: ""  # Set via environment variable: DOUBAO_API_KEY
-    base_url: "https://openspeech.bytedance.com/api/v1/asr"
-    language: "zh"
+    ws_url: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
     sample_rate: 16000
-
-  # Whisper Local Settings (P2 Later)
-  whisper:
-    model_size: "small"  # tiny, base, small, medium, large
-    language: "zh"
-    device: "cuda"  # cuda or cpu
-    compute_type: "float16"
+    bits: 16
+    channels: 1
+    segment_duration_ms: 200  # Audio chunk size
+    enable_itn: true          # Inverse text normalization
+    enable_punc: true         # Punctuation
+    enable_ddc: true          # Spoken language smoothing
 
 # === Evaluation Settings ===
 evaluation:
