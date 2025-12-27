@@ -187,6 +187,29 @@ npm run dev
 
 ---
 
+## AI报告（云API）
+
+系统支持 **OpenAI 兼容协议** 的云端大模型，用于生成训练报告的 AI 改进建议。
+
+**环境变量配置：**
+
+```bash
+export LLM_PROVIDER=openai
+export LLM_API_KEY=你的API_KEY
+export LLM_BASE_URL=你的服务BaseURL
+export LLM_MODEL=模型名称
+```
+
+**国内云API推荐（均支持 OpenAI 兼容调用）：**
+
+- **阿里云通义千问（DashScope）**: `https://dashscope.aliyuncs.com/compatible-mode/v1`
+- **月之暗面 Moonshot**: `https://api.moonshot.cn/v1`
+- **DeepSeek**: `https://api.deepseek.com/v1`
+
+未配置时报告会提示「AI未配置」。
+
+---
+
 ## 项目结构
 
 ```

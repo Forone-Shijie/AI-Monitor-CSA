@@ -168,7 +168,13 @@ evaluation:
 export DOUBAO_APP_ID=your_app_id
 export DOUBAO_ACCESS_TOKEN=your_token
 
-# OpenAI (报告生成，可选)
+# 云端大模型（报告生成，可选，OpenAI 兼容）
+export LLM_PROVIDER=openai
+export LLM_API_KEY=your_api_key
+export LLM_BASE_URL=https://api.moonshot.cn/v1
+export LLM_MODEL=moonshot-v1-8k
+
+# 兼容老变量（如已使用可保留）
 export OPENAI_API_KEY=your_api_key
 ```
 

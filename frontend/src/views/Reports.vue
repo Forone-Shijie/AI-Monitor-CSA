@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useReportStore } from '@/stores/report'
 import RadarChart from '@/components/charts/RadarChart.vue'
 import ScorePanel from '@/components/monitoring/ScorePanel.vue'
-import type { ReportData, Suggestion } from '@/types/api'
+import type { ReportData, Suggestion, ScoreBreakdown } from '@/types/api'
 
 const reportStore = useReportStore()
 
@@ -14,15 +14,14 @@ const reports = computed(() => reportStore.reports)
 const currentReport = computed<ReportData | null>(() => reportStore.currentReport)
 
 const currentScores = computed(() => {
-  if (!currentReport.value?.evaluation?.scores) {
+  if (!currentReport.value) {
     return { pose: 0, action: 0, communication: 0, total: 0 }
   }
-  const scores = currentReport.value.evaluation.scores
   return {
-    pose: scores.pose.score,
-    action: scores.action.score,
-    communication: scores.communication.score,
-    total: scores.total
+    pose: currentReport.value.pose_score ?? 0,
+    action: currentReport.value.action_score ?? 0,
+    communication: currentReport.value.communication_score ?? 0,
+    total: currentReport.value.total_score ?? 0
   }
 })
 
@@ -30,12 +29,41 @@ const suggestions = computed<Suggestion[]>(() =>
   currentReport.value?.suggestions || []
 )
 
+const reportScores = computed<ScoreBreakdown | null>(() => {
+  if (!currentReport.value) return null
+  const poseScore = currentReport.value.pose_score ?? 0
+  const actionScore = currentReport.value.action_score ?? 0
+  const communicationScore = currentReport.value.communication_score ?? 0
+  return {
+    pose: {
+      score: poseScore,
+      weight: 0.3,
+      weighted_score: poseScore * 0.3,
+      details: {}
+    },
+    action: {
+      score: actionScore,
+      weight: 0.4,
+      weighted_score: actionScore * 0.4,
+      details: {}
+    },
+    communication: {
+      score: communicationScore,
+      weight: 0.3,
+      weighted_score: communicationScore * 0.3,
+      details: {}
+    },
+    total: currentReport.value.total_score ?? 0,
+    weighted_total: currentReport.value.total_score ?? 0
+  }
+})
+
 const highPrioritySuggestions = computed(() =>
-  suggestions.value.filter(s => s.priority === 'high')
+  suggestions.value.filter(s => s.priority === 1)
 )
 
 const otherSuggestions = computed(() =>
-  suggestions.value.filter(s => s.priority !== 'high')
+  suggestions.value.filter(s => s.priority !== 1)
 )
 
 async function loadReports() {
@@ -76,17 +104,17 @@ function getGradeClass(grade: string): string {
   return `grade--${grade.toLowerCase()}`
 }
 
-function getPriorityClass(priority: string): string {
-  return `priority--${priority}`
+function getPriorityClass(priority: number): string {
+  if (priority === 1) return 'priority--high'
+  if (priority === 2) return 'priority--medium'
+  return 'priority--low'
 }
 
-function getPriorityLabel(priority: string): string {
-  switch (priority) {
-    case 'high': return '重要'
-    case 'medium': return '建议'
-    case 'low': return '参考'
-    default: return priority
-  }
+function getPriorityLabel(priority: number): string {
+  if (priority === 1) return '重要'
+  if (priority === 2) return '建议'
+  if (priority === 3) return '参考'
+  return String(priority)
 }
 
 function getDimensionLabel(dimension: string): string {
@@ -176,8 +204,8 @@ onMounted(loadReports)
               </div>
               <div class="score-display">
                 <span class="total-score hud-number">{{ currentScores.total }}</span>
-                <span class="grade-badge" :class="getGradeClass(currentReport.evaluation.grade)">
-                  {{ currentReport.evaluation.grade }}
+                <span class="grade-badge" :class="getGradeClass(currentReport.grade)">
+                  {{ currentReport.grade }}
                 </span>
               </div>
             </div>
@@ -193,7 +221,7 @@ onMounted(loadReports)
               <div class="hud-panel-header">
                 <span class="hud-panel-title">能力雷达图</span>
               </div>
-              <RadarChart :scores="currentReport.evaluation.scores" height="280px" />
+              <RadarChart :scores="reportScores" height="280px" />
             </div>
 
             <div class="hud-panel scores-panel">
@@ -205,11 +233,15 @@ onMounted(loadReports)
           </div>
 
           <!-- Suggestions -->
-          <div class="hud-panel suggestions-panel">
-            <div class="hud-panel-header">
-              <span class="hud-panel-title">AI改进建议</span>
-              <span class="suggestion-count">{{ suggestions.length }} 条建议</span>
-            </div>
+            <div class="hud-panel suggestions-panel">
+              <div class="hud-panel-header">
+                <span class="hud-panel-title">AI改进建议</span>
+                <span class="suggestion-count">{{ suggestions.length }} 条建议</span>
+              </div>
+
+              <div v-if="currentReport.ai_notice" class="ai-notice">
+                {{ currentReport.ai_notice }}
+              </div>
 
             <!-- High Priority -->
             <div v-if="highPrioritySuggestions.length > 0" class="suggestion-group">
@@ -221,13 +253,13 @@ onMounted(loadReports)
                 :class="getPriorityClass(suggestion.priority)"
               >
                 <div class="suggestion-header">
-                  <span class="suggestion-dimension">{{ getDimensionLabel(suggestion.dimension) }}</span>
+                  <span class="suggestion-dimension">{{ getDimensionLabel(suggestion.category) }}</span>
                   <span class="suggestion-priority">{{ getPriorityLabel(suggestion.priority) }}</span>
                 </div>
                 <div class="suggestion-issue">{{ suggestion.issue }}</div>
-                <div class="suggestion-recommendation">{{ suggestion.recommendation }}</div>
-                <div v-if="suggestion.reference" class="suggestion-reference">
-                  参考: {{ suggestion.reference }}
+                <div class="suggestion-recommendation">{{ suggestion.suggestion }}</div>
+                <div v-if="suggestion.example" class="suggestion-reference">
+                  参考: {{ suggestion.example }}
                 </div>
               </div>
             </div>
@@ -242,11 +274,11 @@ onMounted(loadReports)
                 :class="getPriorityClass(suggestion.priority)"
               >
                 <div class="suggestion-header">
-                  <span class="suggestion-dimension">{{ getDimensionLabel(suggestion.dimension) }}</span>
+                  <span class="suggestion-dimension">{{ getDimensionLabel(suggestion.category) }}</span>
                   <span class="suggestion-priority">{{ getPriorityLabel(suggestion.priority) }}</span>
                 </div>
                 <div class="suggestion-issue">{{ suggestion.issue }}</div>
-                <div class="suggestion-recommendation">{{ suggestion.recommendation }}</div>
+                <div class="suggestion-recommendation">{{ suggestion.suggestion }}</div>
               </div>
             </div>
 
@@ -486,6 +518,16 @@ onMounted(loadReports)
 .suggestion-count {
   font-size: 12px;
   color: var(--hud-text-muted);
+}
+
+.ai-notice {
+  margin-top: var(--hud-spacing-sm);
+  padding: var(--hud-spacing-sm) var(--hud-spacing-md);
+  background: rgba(255, 204, 0, 0.1);
+  border: 1px solid rgba(255, 204, 0, 0.35);
+  border-radius: var(--hud-radius-sm);
+  color: var(--hud-warning);
+  font-size: 12px;
 }
 
 .suggestion-group {

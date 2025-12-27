@@ -251,17 +251,29 @@ export interface ReportData {
   trainee_name: string
   scenario_id: string
   scenario_name: string
-  evaluation: EvaluationData
-  suggestions: Suggestion[]
   generated_at: string
+  session_date: string
+  duration_seconds: number
+  total_score: number
+  grade: string
+  pose_score: number
+  action_score: number
+  communication_score: number
+  suggestions: Suggestion[]
+  ai_summary: string
+  ai_configured: boolean
+  ai_provider: string
+  ai_notice: string
+  strengths: string[]
+  improvements: string[]
 }
 
 export interface Suggestion {
-  dimension: string
-  priority: 'high' | 'medium' | 'low'
+  category: string
+  priority: number
   issue: string
-  recommendation: string
-  reference?: string
+  suggestion: string
+  example?: string
 }
 
 export interface ReportListResponse {
@@ -279,6 +291,12 @@ export interface ReportSummary {
   total_score: number
   grade: string
   generated_at: string
+}
+
+export interface ReportResponse {
+  success: boolean
+  message: string
+  data: ReportData
 }
 
 // =============================================================================

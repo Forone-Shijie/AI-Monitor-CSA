@@ -64,6 +64,7 @@ from .pose_scorer import (
 from .report_generator import (
     ImprovementSuggestion,
     LLMProvider,
+    DisabledLLMProvider,
     MockLLMProvider,
     OpenAIProvider,
     ReportGenerator,
@@ -97,6 +98,7 @@ __all__ = [
     "TrainingReport",
     "ImprovementSuggestion",
     "LLMProvider",
+    "DisabledLLMProvider",
     "MockLLMProvider",
     "OpenAIProvider",
 ]

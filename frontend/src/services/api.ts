@@ -14,6 +14,7 @@ import type {
   EvaluationData,
   ReportData,
   ReportListResponse,
+  ReportResponse,
   PlaybackData,
   PlaybackSummary,
   TimelineEvent,
@@ -163,8 +164,8 @@ export async function listReports(
 }
 
 export async function getReport(reportId: string): Promise<ReportData> {
-  const response = await apiClient.get<ReportData>(`/api/reports/${reportId}`)
-  return response.data
+  const response = await apiClient.get<ReportResponse>(`/api/reports/${reportId}`)
+  return response.data.data
 }
 
 // =============================================================================

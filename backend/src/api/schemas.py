@@ -325,6 +325,9 @@ class ReportData(BaseModel):
     communication_score: float
     suggestions: List[SuggestionData] = []
     ai_summary: str = ""
+    ai_configured: bool = False
+    ai_provider: str = ""
+    ai_notice: str = ""
     strengths: List[str] = []
     improvements: List[str] = []
 

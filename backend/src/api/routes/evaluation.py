@@ -218,6 +218,9 @@ async def list_reports(
                         SuggestionData(**s) for s in report.get("suggestions", [])
                     ],
                     ai_summary=report.get("ai_summary", ""),
+                    ai_configured=report.get("ai_configured", False),
+                    ai_provider=report.get("ai_provider", ""),
+                    ai_notice=report.get("ai_notice", ""),
                     strengths=report.get("strengths", []),
                     improvements=report.get("improvements", []),
                 )
@@ -277,6 +280,9 @@ async def get_report(session_id: str) -> ReportResponse:
             SuggestionData(**s) for s in report.get("suggestions", [])
         ],
         ai_summary=report.get("ai_summary", ""),
+        ai_configured=report.get("ai_configured", False),
+        ai_provider=report.get("ai_provider", ""),
+        ai_notice=report.get("ai_notice", ""),
         strengths=report.get("strengths", []),
         improvements=report.get("improvements", []),
     )
@@ -393,6 +399,9 @@ async def generate_report(session_id: str) -> ReportResponse:
                 for s in report.suggestions
             ],
             ai_summary=report.ai_summary,
+            ai_configured=report.ai_configured,
+            ai_provider=report.ai_provider,
+            ai_notice=report.ai_notice,
             strengths=report.strengths,
             improvements=report.improvements,
         )

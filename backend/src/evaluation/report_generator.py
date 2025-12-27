@@ -13,7 +13,7 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .evaluator import EvaluationResult
 
@@ -62,6 +62,9 @@ class TrainingReport:
     # AI suggestions
     suggestions: List[ImprovementSuggestion] = field(default_factory=list)
     ai_summary: str = ""
+    ai_configured: bool = False
+    ai_provider: str = ""
+    ai_notice: str = ""
 
     # Detailed feedback
     strengths: List[str] = field(default_factory=list)
@@ -102,6 +105,9 @@ class TrainingReport:
                 for s in self.suggestions
             ],
             "ai_summary": self.ai_summary,
+            "ai_configured": self.ai_configured,
+            "ai_provider": self.ai_provider,
+            "ai_notice": self.ai_notice,
             "strengths": self.strengths,
             "improvements": self.improvements,
         }
@@ -181,13 +187,25 @@ class MockLLMProvider(LLMProvider):
         self._available = available
 
 
+class DisabledLLMProvider(LLMProvider):
+    """LLM provider that is explicitly disabled."""
+
+    def generate(self, prompt: str, max_tokens: int = 500) -> str:
+        """Return empty response when disabled."""
+        return ""
+
+    def is_available(self) -> bool:
+        """Always unavailable."""
+        return False
+
+
 class OpenAIProvider(LLMProvider):
     """OpenAI API provider."""
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gpt-3.5-turbo",
+        model: Optional[str] = None,
         base_url: Optional[str] = None,
     ) -> None:
         """
@@ -198,9 +216,9 @@ class OpenAIProvider(LLMProvider):
             model: Model to use
             base_url: Optional custom base URL
         """
-        self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        self._model = model
-        self._base_url = base_url
+        self._api_key = api_key or _get_env_value(["LLM_API_KEY", "OPENAI_API_KEY"])
+        self._model = model or _get_env_value(["LLM_MODEL", "OPENAI_MODEL"]) or "gpt-3.5-turbo"
+        self._base_url = base_url or _get_env_value(["LLM_BASE_URL", "OPENAI_BASE_URL"])
         self._client = None
 
     def generate(self, prompt: str, max_tokens: int = 500) -> str:
@@ -242,7 +260,44 @@ class OpenAIProvider(LLMProvider):
 
     def is_available(self) -> bool:
         """Check if OpenAI API is available."""
-        return bool(self._api_key)
+        if not self._api_key:
+            return False
+        try:
+            import openai  # noqa: F401
+        except Exception:
+            return False
+        return True
+
+
+def _get_env_value(keys: List[str]) -> Optional[str]:
+    """Return the first non-empty environment value from keys."""
+    for key in keys:
+        value = os.environ.get(key)
+        if value:
+            return value
+    return None
+
+
+def _build_llm_provider_from_env() -> Tuple[LLMProvider, str, bool]:
+    """Create an LLM provider based on environment variables."""
+    provider = (os.environ.get("LLM_PROVIDER") or "auto").strip().lower()
+    api_key = _get_env_value(["LLM_API_KEY", "OPENAI_API_KEY"])
+    base_url = _get_env_value(["LLM_BASE_URL", "OPENAI_BASE_URL"])
+    model = _get_env_value(["LLM_MODEL", "OPENAI_MODEL"])
+
+    if provider in ("openai", "openai_compatible", "compatible"):
+        llm = OpenAIProvider(api_key=api_key, model=model, base_url=base_url)
+        return llm, "openai_compatible", llm.is_available()
+    if provider in ("mock", "template"):
+        return MockLLMProvider(), "mock", False
+    if provider in ("none", "disabled", "off"):
+        return DisabledLLMProvider(), "disabled", False
+
+    if api_key:
+        llm = OpenAIProvider(api_key=api_key, model=model, base_url=base_url)
+        return llm, "openai_compatible", llm.is_available()
+
+    return DisabledLLMProvider(), "disabled", False
 
 
 class ReportGenerator:
@@ -302,12 +357,47 @@ class ReportGenerator:
             llm_provider: LLM provider for AI suggestions
             use_llm: Whether to use LLM for suggestions
         """
-        self._llm_provider = llm_provider or MockLLMProvider()
+        if llm_provider is None:
+            provider, name, configured = _build_llm_provider_from_env()
+        else:
+            provider = llm_provider
+            name, configured = self._describe_provider(provider)
+
+        self._llm_provider = provider
+        self._ai_provider = name
+        self._ai_configured = configured
         self._use_llm = use_llm
 
     def set_llm_provider(self, provider: LLMProvider) -> None:
         """Set LLM provider."""
         self._llm_provider = provider
+        name, configured = self._describe_provider(provider)
+        self._ai_provider = name
+        self._ai_configured = configured
+
+    def _describe_provider(self, provider: LLMProvider) -> Tuple[str, bool]:
+        """Return provider name and configured status."""
+        if isinstance(provider, MockLLMProvider):
+            return "mock", False
+        if isinstance(provider, DisabledLLMProvider):
+            return "disabled", False
+        if isinstance(provider, OpenAIProvider):
+            return "openai_compatible", provider.is_available()
+        return provider.__class__.__name__.lower(), provider.is_available()
+
+    def _build_ai_notice(self, include_ai_suggestions: bool) -> str:
+        """Return a user-facing notice when AI is not configured."""
+        if not include_ai_suggestions or not self._use_llm:
+            return ""
+        if self._ai_configured:
+            return ""
+        if self._ai_provider == "mock":
+            return "AI未配置：当前使用Mock模板（未接入在线大模型）"
+        if self._ai_provider == "disabled":
+            return (
+                "AI未配置：请设置 LLM_PROVIDER=openai，并配置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL"
+            )
+        return "AI未配置：请检查 LLM_PROVIDER 和 API Key 配置"
 
     def generate(
         self,
@@ -356,6 +446,8 @@ class ReportGenerator:
             suggestions = self.generate_suggestions(evaluation)
             ai_summary = self._generate_ai_summary(evaluation)
 
+        ai_notice = self._build_ai_notice(include_ai_suggestions)
+
         # Combine feedback
         strengths = evaluation.strengths.copy()
         improvements = evaluation.improvements.copy()
@@ -378,6 +470,9 @@ class ReportGenerator:
             communication_score=comm_score,
             suggestions=suggestions,
             ai_summary=ai_summary,
+            ai_configured=self._ai_configured,
+            ai_provider=self._ai_provider,
+            ai_notice=ai_notice,
             strengths=strengths,
             improvements=improvements,
         )
