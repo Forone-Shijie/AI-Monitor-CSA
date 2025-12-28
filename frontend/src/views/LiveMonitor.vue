@@ -8,6 +8,7 @@ import ScorePanel from '@/components/monitoring/ScorePanel.vue'
 import AlertPanel from '@/components/monitoring/AlertPanel.vue'
 import SkeletonOverlay from '@/components/monitoring/SkeletonOverlay.vue'
 import ActionTimeline from '@/components/monitoring/ActionTimeline.vue'
+import ReportLoadingModal from '@/components/common/ReportLoadingModal.vue'
 import { streamingClient, audioStreamingClient } from '@/services/websocket'
 import type { ASRResult } from '@/services/websocket'
 import { captureVideoFrame, startAudioCapture, stopMediaStream } from '@/services/mediaDevices'
@@ -23,6 +24,7 @@ const videoRef = ref<HTMLVideoElement | null>(null)
 const videoContainerRef = ref<HTMLDivElement | null>(null)
 const videoWidth = ref(640)
 const videoHeight = ref(480)
+const actualVideoRect = ref({ x: 0, y: 0, width: 640, height: 480 })
 const sessionDuration = ref(0)
 const durationInterval = ref<number | null>(null)
 const isVideoReady = ref(false)
@@ -38,6 +40,10 @@ const asrResultUnsubscribe = ref<(() => void) | null>(null)
 const localAsrText = ref('')
 const asrHistory = ref<string[]>([])
 const isAudioConnected = ref(false)
+
+// Report loading modal
+const showReportLoading = ref(false)
+const loadingModalRef = ref<InstanceType<typeof ReportLoadingModal> | null>(null)
 
 const hasSession = computed(() => sessionStore.hasActiveSession)
 const isRunning = computed(() => sessionStore.isRunning)
@@ -97,6 +103,7 @@ async function startVideoStream(): Promise<boolean> {
       videoWidth.value = video.videoWidth
       videoHeight.value = video.videoHeight
       video.play()
+      updateVideoRect()
       resolve(true)
       return
     }
@@ -109,6 +116,7 @@ async function startVideoStream(): Promise<boolean> {
         videoWidth.value = video.videoWidth
         videoHeight.value = video.videoHeight
         video.play()
+        updateVideoRect()
         cleanup()
         resolve(true)
       }
@@ -324,6 +332,11 @@ function cleanupStreamHandler() {
 async function stopMonitoring() {
   if (!sessionStore.activeSession) return
 
+  // Show loading modal
+  showReportLoading.value = true
+  const minDisplayTime = 3000 // Minimum 3 seconds for animation
+  const startTime = Date.now()
+
   try {
     stopFrameCapturer()
     stopAudioStreaming()
@@ -334,10 +347,26 @@ async function stopMonitoring() {
     stopDurationTimer()
     localAsrText.value = ''
     asrHistory.value = []
-    router.push('/reports')
+
+    // Ensure minimum display time for animation
+    const elapsed = Date.now() - startTime
+    if (elapsed < minDisplayTime) {
+      await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed))
+    }
+
+    // Trigger completion animation
+    if (loadingModalRef.value) {
+      loadingModalRef.value.complete()
+    }
   } catch (error) {
     console.error('Failed to stop monitoring:', error)
+    showReportLoading.value = false
   }
+}
+
+function onReportLoadingComplete() {
+  showReportLoading.value = false
+  router.push('/reports')
 }
 
 async function pauseMonitoring() {
@@ -376,11 +405,58 @@ function formatDuration(seconds: number): string {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
 }
 
+/**
+ * Calculate actual video display area within container
+ * When using object-fit: contain, the video may have letterbox/pillarbox
+ */
+function updateVideoRect() {
+  const video = videoRef.value
+  const container = videoContainerRef.value
+  if (!video || !container) return
+
+  const containerWidth = container.clientWidth
+  const containerHeight = container.clientHeight
+  const videoNativeWidth = video.videoWidth
+  const videoNativeHeight = video.videoHeight
+
+  if (videoNativeWidth === 0 || videoNativeHeight === 0) return
+
+  const containerAspect = containerWidth / containerHeight
+  const videoAspect = videoNativeWidth / videoNativeHeight
+
+  let displayWidth: number
+  let displayHeight: number
+  let offsetX: number
+  let offsetY: number
+
+  if (videoAspect > containerAspect) {
+    // Video is wider - letterbox (black bars top/bottom)
+    displayWidth = containerWidth
+    displayHeight = containerWidth / videoAspect
+    offsetX = 0
+    offsetY = (containerHeight - displayHeight) / 2
+  } else {
+    // Video is taller - pillarbox (black bars left/right)
+    displayHeight = containerHeight
+    displayWidth = containerHeight * videoAspect
+    offsetX = (containerWidth - displayWidth) / 2
+    offsetY = 0
+  }
+
+  actualVideoRect.value = {
+    x: offsetX,
+    y: offsetY,
+    width: displayWidth,
+    height: displayHeight
+  }
+}
+
 function handleResize() {
   if (videoContainerRef.value) {
     const rect = videoContainerRef.value.getBoundingClientRect()
     videoWidth.value = rect.width
     videoHeight.value = (rect.width * 9) / 16
+    updateVideoRect()
   }
 }
 
@@ -511,8 +587,10 @@ onUnmounted(() => {
             <SkeletonOverlay
               v-if="currentPose"
               :pose-data="currentPose"
-              :width="videoWidth"
-              :height="videoHeight"
+              :width="actualVideoRect.width"
+              :height="actualVideoRect.height"
+              :offset-x="actualVideoRect.x"
+              :offset-y="actualVideoRect.y"
               :show-angles="true"
             />
 
@@ -639,6 +717,13 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Report Loading Modal -->
+    <ReportLoadingModal
+      ref="loadingModalRef"
+      :visible="showReportLoading"
+      @complete="onReportLoadingComplete"
+    />
   </div>
 </template>
 
@@ -789,7 +874,8 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #000;
   z-index: 1;
 }
 

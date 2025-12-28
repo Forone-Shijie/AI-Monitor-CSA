@@ -168,6 +168,11 @@ export async function getReport(reportId: string): Promise<ReportData> {
   return response.data.data
 }
 
+export async function getDemoReport(type: 'perfect' | 'improvement'): Promise<ReportData> {
+  const response = await apiClient.get<ReportResponse>(`/api/reports/demo/${type}`)
+  return response.data.data
+}
+
 // =============================================================================
 // Playback API
 // =============================================================================

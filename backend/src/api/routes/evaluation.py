@@ -235,6 +235,73 @@ async def list_reports(
 
 
 @router.get(
+    "/reports/demo/{report_type}",
+    response_model=ReportResponse,
+    responses={404: {"model": ErrorResponse}},
+    summary="Get demo report",
+    description="Get preset demo report (perfect or improvement)",
+)
+async def get_demo_report(report_type: str) -> ReportResponse:
+    """Get preset demo report for demonstration purposes."""
+    import json
+    from pathlib import Path
+
+    if report_type not in ("perfect", "improvement"):
+        raise HTTPException(
+            status_code=404,
+            detail="Demo report type must be 'perfect' or 'improvement'",
+        )
+
+    # Determine file path
+    base_path = Path(__file__).parent.parent.parent.parent  # backend/
+    demo_file = base_path / "data" / "demo_reports" / f"{report_type}_report.json"
+
+    if not demo_file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Demo report file not found: {demo_file}",
+        )
+
+    with open(demo_file, "r", encoding="utf-8") as f:
+        report = json.load(f)
+
+    # Convert to ReportData format
+    session_info = report.get("session", {})
+    trainee_info = report.get("trainee", {})
+    scores = report.get("scores", {})
+
+    data = ReportData(
+        report_id=report.get("report_id", ""),
+        generated_at=report.get("generated_at", ""),
+        session_id=session_info.get("id", ""),
+        trainee_id=trainee_info.get("id", ""),
+        trainee_name=trainee_info.get("name", ""),
+        scenario_id=session_info.get("scenario_id", ""),
+        scenario_name=session_info.get("scenario_name", ""),
+        session_date=session_info.get("date", ""),
+        duration_seconds=session_info.get("duration_seconds", 0),
+        total_score=scores.get("total", 0),
+        grade=scores.get("grade", ""),
+        pose_score=scores.get("pose", 0),
+        action_score=scores.get("action", 0),
+        communication_score=scores.get("communication", 0),
+        suggestions=[SuggestionData(**s) for s in report.get("suggestions", [])],
+        ai_summary=report.get("ai_summary", ""),
+        ai_configured=report.get("ai_configured", False),
+        ai_provider=report.get("ai_provider", ""),
+        ai_notice=report.get("ai_notice", ""),
+        strengths=report.get("strengths", []),
+        improvements=report.get("improvements", []),
+    )
+
+    return ReportResponse(
+        success=True,
+        message=f"Demo report ({report_type}) retrieved",
+        data=data,
+    )
+
+
+@router.get(
     "/reports/{session_id}",
     response_model=ReportResponse,
     responses={404: {"model": ErrorResponse}},

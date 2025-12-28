@@ -151,6 +151,20 @@ export const useReportStore = defineStore('report', () => {
     }
   }
 
+  async function fetchDemoReport(type: 'perfect' | 'improvement') {
+    isLoading.value = true
+    error.value = null
+    try {
+      currentReport.value = await api.getDemoReport(type)
+      return currentReport.value
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to fetch demo report'
+      throw e
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   function reset() {
     currentReport.value = null
     currentEvaluation.value = null
@@ -183,6 +197,7 @@ export const useReportStore = defineStore('report', () => {
     fetchPlaybackData,
     fetchPlaybackSummary,
     fetchTimeline,
+    fetchDemoReport,
     reset
   }
 })

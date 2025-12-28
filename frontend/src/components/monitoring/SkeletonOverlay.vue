@@ -6,10 +6,14 @@ const props = withDefaults(defineProps<{
   poseData: PoseData | null
   width?: number
   height?: number
+  offsetX?: number
+  offsetY?: number
   showAngles?: boolean
 }>(), {
   width: 640,
   height: 480,
+  offsetX: 0,
+  offsetY: 0,
   showAngles: false
 })
 
@@ -202,6 +206,7 @@ onMounted(() => {
     class="skeleton-overlay"
     :width="width"
     :height="height"
+    :style="{ left: `${offsetX}px`, top: `${offsetY}px` }"
   ></canvas>
 </template>
 

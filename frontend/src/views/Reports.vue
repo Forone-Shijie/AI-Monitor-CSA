@@ -126,6 +126,27 @@ function getDimensionLabel(dimension: string): string {
   }
 }
 
+// Format text: remove markdown bold syntax and preserve newlines
+function formatText(text: string): string {
+  if (!text) return ''
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold**
+    .replace(/\*(.*?)\*/g, '$1')       // Remove *italic*
+}
+
+// Load demo reports
+async function loadDemoReport(type: 'perfect' | 'improvement') {
+  isLoading.value = true
+  selectedReportId.value = `demo-${type}`
+  try {
+    await reportStore.fetchDemoReport(type)
+  } catch (error) {
+    console.error('Failed to load demo report:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
 onMounted(loadReports)
 </script>
 
@@ -146,6 +167,16 @@ onMounted(loadReports)
         <div class="hud-panel list-panel">
           <div class="hud-panel-header">
             <span class="hud-panel-title">报告列表</span>
+          </div>
+
+          <!-- Demo Report Buttons -->
+          <div class="demo-buttons">
+            <button class="hud-button demo-btn demo-btn--perfect" @click="loadDemoReport('perfect')">
+              查看满分示例
+            </button>
+            <button class="hud-button demo-btn demo-btn--improve" @click="loadDemoReport('improvement')">
+              查看改进示例
+            </button>
           </div>
 
           <div v-if="isLoading && reports.length === 0" class="loading">
@@ -241,6 +272,12 @@ onMounted(loadReports)
 
               <div v-if="currentReport.ai_notice" class="ai-notice">
                 {{ currentReport.ai_notice }}
+              </div>
+
+              <!-- AI Summary -->
+              <div v-if="currentReport.ai_summary" class="ai-summary-section">
+                <h4 class="summary-title">AI 评估总结</h4>
+                <div class="ai-summary-content">{{ formatText(currentReport.ai_summary) }}</div>
               </div>
 
             <!-- High Priority -->
@@ -606,6 +643,62 @@ onMounted(loadReports)
   font-size: 13px;
   color: var(--hud-text-secondary);
   line-height: 1.5;
+  white-space: pre-line;
+}
+
+/* Demo Buttons */
+.demo-buttons {
+  display: flex;
+  gap: var(--hud-spacing-sm);
+  padding: var(--hud-spacing-sm) var(--hud-spacing-md);
+  border-bottom: 1px solid var(--hud-border-dim);
+}
+
+.demo-btn {
+  flex: 1;
+  padding: var(--hud-spacing-sm);
+  font-size: 12px;
+}
+
+.demo-btn--perfect {
+  border-color: var(--hud-success);
+  color: var(--hud-success);
+}
+
+.demo-btn--perfect:hover {
+  background: rgba(0, 255, 136, 0.1);
+}
+
+.demo-btn--improve {
+  border-color: var(--hud-warning);
+  color: var(--hud-warning);
+}
+
+.demo-btn--improve:hover {
+  background: rgba(255, 204, 0, 0.1);
+}
+
+/* AI Summary Section */
+.ai-summary-section {
+  margin: var(--hud-spacing-md) 0;
+  padding: var(--hud-spacing-md);
+  background: rgba(0, 212, 255, 0.05);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: var(--hud-radius-sm);
+}
+
+.summary-title {
+  font-size: 13px;
+  color: var(--hud-border);
+  margin: 0 0 var(--hud-spacing-sm) 0;
+  font-weight: 500;
+}
+
+.ai-summary-content {
+  font-size: 14px;
+  color: var(--hud-text-primary);
+  line-height: 1.6;
+  white-space: pre-line;
 }
 
 .suggestion-reference {
