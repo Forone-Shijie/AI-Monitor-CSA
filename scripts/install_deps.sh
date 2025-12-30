@@ -39,7 +39,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 
-echo -e "${YELLOW}[1/7] 卸载可能冲突的旧包...${NC}"
+echo -e "${YELLOW}[1/8] 卸载可能冲突的旧包...${NC}"
 pip uninstall -y torch torchvision torchaudio mediapipe 2>/dev/null || true
 pip uninstall -y mmcv mmcv-full mmdet mmpose mmengine openmim 2>/dev/null || true
 pip uninstall -y xtcocotools pycocotools 2>/dev/null || true
@@ -47,18 +47,39 @@ pip uninstall -y numpy 2>/dev/null || true
 echo -e "${GREEN}  ✓ 旧包已清理${NC}"
 echo ""
 
-echo -e "${YELLOW}[2/7] 安装 PyTorch with CUDA 12.1...${NC}"
+echo -e "${YELLOW}[2/8] 安装兼容版本的 NumPy (必须在 PyTorch 之前)...${NC}"
+# NumPy 2.x 与 PyTorch/mmcv 不兼容，必须使用 1.x
+pip install "numpy>=1.24.0,<2.0.0"
+echo -e "${GREEN}  ✓ NumPy 版本已锁定${NC}"
+echo ""
+
+echo -e "${YELLOW}[3/8] 安装 PyTorch with CUDA 12.1...${NC}"
 pip install torch==2.1.0+cu121 torchvision==0.16.0+cu121 \
     --index-url https://download.pytorch.org/whl/cu121
 echo -e "${GREEN}  ✓ PyTorch 安装完成${NC}"
 echo ""
 
-echo -e "${YELLOW}[3/7] 安装 MMPose 生态 (不含 xtcocotools)...${NC}"
+echo -e "${YELLOW}[4/8] 安装 MMPose 生态 (不含 xtcocotools)...${NC}"
 pip install openmim==0.3.9
-mim install mmengine==0.10.2
-# 从 OpenMMLab 安装预编译的 mmcv (带 CUDA 扩展)
-pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
-mim install mmdet==3.2.0
+
+# mmengine 直接用 pip 安装 (避免 mim 的网络问题)
+pip install mmengine==0.10.2
+
+# mmcv: 优先从 OpenMMLab 下载预编译版本，失败则重试
+echo -e "  ${CYAN}下载 mmcv (可能需要几分钟)...${NC}"
+MMCV_URL="https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html"
+for i in 1 2 3; do
+    if pip install mmcv==2.1.0 -f "$MMCV_URL" --timeout 120; then
+        echo -e "${GREEN}  ✓ mmcv 安装成功${NC}"
+        break
+    else
+        echo -e "${YELLOW}  重试 mmcv 下载 ($i/3)...${NC}"
+        sleep 5
+    fi
+done
+
+# mmdet 直接用 pip
+pip install mmdet==3.2.0
 
 # 安装 mmpose 必需依赖 (不含 xtcocotools)
 pip install munkres scipy matplotlib json-tricks
@@ -69,20 +90,20 @@ pip install mmpose==1.3.1 --no-deps
 echo -e "${GREEN}  ✓ MMPose 生态安装完成${NC}"
 echo ""
 
-echo -e "${YELLOW}[4/7] 安装其他后端依赖...${NC}"
+echo -e "${YELLOW}[5/8] 安装其他后端依赖...${NC}"
 cd "$BACKEND_DIR"
 pip install -r requirements.txt
 echo -e "${GREEN}  ✓ 后端依赖安装完成${NC}"
 echo ""
 
-echo -e "${YELLOW}[5/7] 锁定关键依赖版本...${NC}"
-# 降级 opencv-python 和 numpy 到兼容版本
+echo -e "${YELLOW}[6/8] 锁定关键依赖版本...${NC}"
+# 确保 opencv-python 和 numpy 版本正确
 pip install opencv-python==4.8.1.78 --force-reinstall
 pip install numpy==1.24.4 --force-reinstall
 echo -e "${GREEN}  ✓ 关键依赖版本已锁定${NC}"
 echo ""
 
-echo -e "${YELLOW}[6/7] 编译安装 xtcocotools...${NC}"
+echo -e "${YELLOW}[7/8] 编译安装 xtcocotools...${NC}"
 # 安装 cython (编译 xtcocotools 需要)
 pip install cython
 # 从源码编译 xtcocotools (使用当前 numpy 1.24.4)
@@ -92,7 +113,7 @@ pip install numpy==1.24.4 --force-reinstall
 echo -e "${GREEN}  ✓ xtcocotools 安装完成${NC}"
 echo ""
 
-echo -e "${YELLOW}[7/7] 验证安装...${NC}"
+echo -e "${YELLOW}[8/8] 验证安装...${NC}"
 python -c "
 import torch
 print(f'  PyTorch: {torch.__version__}')
