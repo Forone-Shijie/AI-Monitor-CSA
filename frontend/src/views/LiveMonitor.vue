@@ -28,8 +28,8 @@ const actualVideoRect = ref({ x: 0, y: 0, width: 640, height: 480 })
 const sessionDuration = ref(0)
 const durationInterval = ref<number | null>(null)
 const isVideoReady = ref(false)
-const frameCapturerInterval = ref<number | null>(null)
-const targetFps = ref(10) // Send frames at 10 FPS to backend
+const frameCapturerRequestId = ref<number | null>(null)
+const targetFps = 15 // Send frames at 15 FPS to backend (~67ms interval)
 const streamResultUnsubscribe = ref<(() => void) | null>(null)
 
 // Audio / ASR state
@@ -150,30 +150,46 @@ function stopVideoStream() {
   isVideoReady.value = false
 }
 
-function startFrameCapturer() {
-  if (frameCapturerInterval.value) return
+// Frame capturer using requestAnimationFrame for better sync
+let lastCaptureTime = 0
+const captureInterval = 1000 / targetFps // ~67ms for 15 FPS
 
-  const interval = 1000 / targetFps.value
+function frameCapturerLoop(timestamp: number) {
+  if (!isVideoReady.value) {
+    frameCapturerRequestId.value = null
+    return
+  }
 
-  frameCapturerInterval.value = window.setInterval(async () => {
-    if (!videoRef.value || !streamingClient.isConnected) return
+  // Throttle to target FPS
+  if (timestamp - lastCaptureTime >= captureInterval) {
+    lastCaptureTime = timestamp
 
     const video = videoRef.value
-    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
-      return
+    if (video && streamingClient.isConnected && video.readyState >= 2) {
+      captureVideoFrame(video, 'image/jpeg', 0.7)
+        .then(blob => {
+          if (blob && blob.size > 0) {
+            streamingClient.sendFrame(blob)
+          }
+        })
+        .catch(err => console.error('[FrameCapturer] Error:', err))
     }
+  }
 
-    const blob = await captureVideoFrame(videoRef.value, 'image/jpeg', 0.7)
-    if (blob && blob.size > 0) {
-      streamingClient.sendFrame(blob)
-    }
-  }, interval)
+  // Continue loop
+  frameCapturerRequestId.value = requestAnimationFrame(frameCapturerLoop)
+}
+
+function startFrameCapturer() {
+  if (frameCapturerRequestId.value) return
+  lastCaptureTime = 0
+  frameCapturerRequestId.value = requestAnimationFrame(frameCapturerLoop)
 }
 
 function stopFrameCapturer() {
-  if (frameCapturerInterval.value) {
-    window.clearInterval(frameCapturerInterval.value)
-    frameCapturerInterval.value = null
+  if (frameCapturerRequestId.value) {
+    cancelAnimationFrame(frameCapturerRequestId.value)
+    frameCapturerRequestId.value = null
   }
 }
 
@@ -298,10 +314,16 @@ async function startMonitoring() {
     await streamingClient.connect(sessionStore.activeSession.session_id)
 
     // Register handler to receive pose detection results
+    let lastFrameNumber = -1
     streamResultUnsubscribe.value = streamingClient.onResult((result) => {
+      // Skip duplicate frames to avoid redundant updates
+      const frameNumber = result.frame_number as number
+      if (frameNumber === lastFrameNumber) return
+      lastFrameNumber = frameNumber
+
       // Update currentFrame with pose detection results from backend
       sessionStore.currentFrame = {
-        frame_number: result.frame_number as number,
+        frame_number: frameNumber,
         timestamp: result.timestamp as number,
         pose: result.pose as PoseData | undefined,
         alerts: []

@@ -67,6 +67,28 @@ show_banner() {
     echo -e "${NC}"
 }
 
+# 检查 GPU 环境
+check_gpu() {
+    echo -e "${YELLOW}检查 GPU 环境 (RTMPose 必需)...${NC}"
+
+    # 检查 nvidia-smi
+    if ! command -v nvidia-smi &> /dev/null; then
+        echo -e "${RED}  ✗ nvidia-smi 未找到，请确保安装了 NVIDIA 驱动${NC}"
+        exit 1
+    fi
+
+    # 检查 CUDA 可用性
+    GPU_CHECK=$($PYTHON -c "import torch; print('CUDA' if torch.cuda.is_available() else 'NO_CUDA')" 2>/dev/null)
+    if [ "$GPU_CHECK" = "CUDA" ]; then
+        GPU_NAME=$($PYTHON -c "import torch; print(torch.cuda.get_device_name(0))" 2>/dev/null)
+        echo -e "${GREEN}  ✓ GPU 可用: $GPU_NAME${NC}"
+    else
+        echo -e "${RED}  ✗ CUDA 不可用，RTMPose 需要 GPU${NC}"
+        echo -e "  请检查 PyTorch CUDA 版本: pip install torch --index-url https://download.pytorch.org/whl/cu124"
+        exit 1
+    fi
+}
+
 # 检查端口占用
 check_ports() {
     echo -e "${YELLOW}检查端口占用...${NC}"
@@ -158,6 +180,7 @@ show_status() {
 # 主函数
 main() {
     show_banner
+    check_gpu
     check_ports
     start_backend
     start_frontend

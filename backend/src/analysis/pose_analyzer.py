@@ -14,6 +14,7 @@ from src.perception.pose_detector import (
     BodyPart,
     JointAngles,
     Landmark,
+    NUM_KEYPOINTS,
     PoseResult,
     PoseType,
 )
@@ -238,7 +239,7 @@ class PoseAnalyzer:
         Returns:
             Lean angle in degrees (0 = upright)
         """
-        if not pose_result.detected or len(pose_result.landmarks) < 33:
+        if not pose_result.detected or len(pose_result.landmarks) < NUM_KEYPOINTS:
             return 0.0
 
         left_shoulder = pose_result.get_landmark(BodyPart.LEFT_SHOULDER)

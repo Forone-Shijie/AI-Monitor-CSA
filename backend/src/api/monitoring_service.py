@@ -23,7 +23,7 @@ from .session_manager import session_manager
 # Lazy imports for video/perception modules (may not be available in all environments)
 CameraInput = None
 FileInput = None
-MediaPipePose = None
+RTMPoseDetector = None
 
 
 def _load_video_modules():
@@ -40,12 +40,12 @@ def _load_video_modules():
 
 
 def _load_perception_modules():
-    """Lazy load perception modules."""
-    global MediaPipePose
-    if MediaPipePose is None:
+    """Lazy load perception modules (RTMPose for GPU-accelerated pose detection)."""
+    global RTMPoseDetector
+    if RTMPoseDetector is None:
         try:
-            from src.perception.mediapipe_pose import MediaPipePose as _MediaPipePose
-            MediaPipePose = _MediaPipePose
+            from src.perception.rtmpose_detector import RTMPoseDetector as _RTMPoseDetector
+            RTMPoseDetector = _RTMPoseDetector
         except ImportError:
             pass
 
@@ -303,12 +303,13 @@ class MonitoringTask:
         else:
             raise ValueError(f"Unsupported video source: {self.video_source_type}")
 
-        # Initialize pose detector
-        if MediaPipePose is not None:
-            self._pose_detector = MediaPipePose(
-                model_complexity=1,
-                min_detection_confidence=0.5,
-                min_tracking_confidence=0.5,
+        # Initialize pose detector (RTMPose with GPU acceleration)
+        if RTMPoseDetector is not None:
+            self._pose_detector = RTMPoseDetector(
+                device="cuda:0",
+                det_score_thr=0.3,
+                pose_score_thr=0.3,
+                max_persons=5,
             )
 
     def _process_pose(self, frame: np.ndarray) -> Optional[Dict]:

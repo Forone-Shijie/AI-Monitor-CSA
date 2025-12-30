@@ -19,38 +19,54 @@ const props = withDefaults(defineProps<{
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
-// MediaPipe Pose connections
+// COCO 17-point Pose connections (RTMPose output format)
+// Keypoint indices:
+//   0: Nose, 1: Left Eye, 2: Right Eye, 3: Left Ear, 4: Right Ear
+//   5: Left Shoulder, 6: Right Shoulder, 7: Left Elbow, 8: Right Elbow
+//   9: Left Wrist, 10: Right Wrist, 11: Left Hip, 12: Right Hip
+//   13: Left Knee, 14: Right Knee, 15: Left Ankle, 16: Right Ankle
 const connections = [
-  // Face
-  [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8],
-  // Torso
-  [11, 12], [11, 23], [12, 24], [23, 24],
+  // Head
+  [0, 1], [0, 2],       // Nose to eyes
+  [1, 3], [2, 4],       // Eyes to ears
+  // Upper body - shoulders
+  [5, 6],               // Left shoulder to right shoulder
   // Left arm
-  [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
+  [5, 7], [7, 9],       // Shoulder to elbow to wrist
   // Right arm
-  [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
+  [6, 8], [8, 10],      // Shoulder to elbow to wrist
+  // Torso
+  [5, 11], [6, 12],     // Shoulders to hips
+  [11, 12],             // Left hip to right hip
   // Left leg
-  [23, 25], [25, 27], [27, 29], [27, 31], [29, 31],
+  [11, 13], [13, 15],   // Hip to knee to ankle
   // Right leg
-  [24, 26], [26, 28], [28, 30], [28, 32], [30, 32]
+  [12, 14], [14, 16],   // Hip to knee to ankle
 ]
 
 const keypointColors: Record<number, string> = {
   // Face - cyan
-  0: '#00d4ff', 1: '#00d4ff', 2: '#00d4ff', 3: '#00d4ff',
-  4: '#00d4ff', 5: '#00d4ff', 6: '#00d4ff', 7: '#00d4ff',
-  8: '#00d4ff', 9: '#00d4ff', 10: '#00d4ff',
+  0: '#00d4ff',   // Nose
+  1: '#00d4ff',   // Left Eye
+  2: '#00d4ff',   // Right Eye
+  3: '#00d4ff',   // Left Ear
+  4: '#00d4ff',   // Right Ear
   // Shoulders - green
-  11: '#00ff88', 12: '#00ff88',
+  5: '#00ff88',   // Left Shoulder
+  6: '#00ff88',   // Right Shoulder
   // Arms - yellow
-  13: '#ffcc00', 14: '#ffcc00', 15: '#ffcc00', 16: '#ffcc00',
-  17: '#ffcc00', 18: '#ffcc00', 19: '#ffcc00', 20: '#ffcc00',
-  21: '#ffcc00', 22: '#ffcc00',
+  7: '#ffcc00',   // Left Elbow
+  8: '#ffcc00',   // Right Elbow
+  9: '#ffcc00',   // Left Wrist
+  10: '#ffcc00',  // Right Wrist
   // Hips - green
-  23: '#00ff88', 24: '#00ff88',
+  11: '#00ff88',  // Left Hip
+  12: '#00ff88',  // Right Hip
   // Legs - orange
-  25: '#ff9944', 26: '#ff9944', 27: '#ff9944', 28: '#ff9944',
-  29: '#ff9944', 30: '#ff9944', 31: '#ff9944', 32: '#ff9944'
+  13: '#ff9944',  // Left Knee
+  14: '#ff9944',  // Right Knee
+  15: '#ff9944',  // Left Ankle
+  16: '#ff9944',  // Right Ankle
 }
 
 // Helper to safely get keypoint coordinates
@@ -76,42 +92,42 @@ const angleLabels = computed(() => {
   const keypoints = props.poseData.keypoints || []
   const result: Array<{ x: number; y: number; value: number }> = []
 
-  // Left elbow angle
-  const kp13 = getKeypointXY(keypoints[13])
-  if (angles.left_elbow !== undefined && kp13) {
+  // Left elbow angle (COCO index 7)
+  const leftElbow = getKeypointXY(keypoints[7])
+  if (angles.left_elbow !== undefined && leftElbow) {
     result.push({
-      x: kp13.x * props.width,
-      y: kp13.y * props.height,
+      x: leftElbow.x * props.width,
+      y: leftElbow.y * props.height,
       value: Math.round(angles.left_elbow)
     })
   }
 
-  // Right elbow angle
-  const kp14 = getKeypointXY(keypoints[14])
-  if (angles.right_elbow !== undefined && kp14) {
+  // Right elbow angle (COCO index 8)
+  const rightElbow = getKeypointXY(keypoints[8])
+  if (angles.right_elbow !== undefined && rightElbow) {
     result.push({
-      x: kp14.x * props.width,
-      y: kp14.y * props.height,
+      x: rightElbow.x * props.width,
+      y: rightElbow.y * props.height,
       value: Math.round(angles.right_elbow)
     })
   }
 
-  // Left knee angle
-  const kp25 = getKeypointXY(keypoints[25])
-  if (angles.left_knee !== undefined && kp25) {
+  // Left knee angle (COCO index 13)
+  const leftKnee = getKeypointXY(keypoints[13])
+  if (angles.left_knee !== undefined && leftKnee) {
     result.push({
-      x: kp25.x * props.width,
-      y: kp25.y * props.height,
+      x: leftKnee.x * props.width,
+      y: leftKnee.y * props.height,
       value: Math.round(angles.left_knee)
     })
   }
 
-  // Right knee angle
-  const kp26 = getKeypointXY(keypoints[26])
-  if (angles.right_knee !== undefined && kp26) {
+  // Right knee angle (COCO index 14)
+  const rightKnee = getKeypointXY(keypoints[14])
+  if (angles.right_knee !== undefined && rightKnee) {
     result.push({
-      x: kp26.x * props.width,
-      y: kp26.y * props.height,
+      x: rightKnee.x * props.width,
+      y: rightKnee.y * props.height,
       value: Math.round(angles.right_knee)
     })
   }
@@ -193,7 +209,13 @@ function drawSkeleton() {
   }
 }
 
-watch(() => props.poseData, drawSkeleton, { deep: true })
+// Watch only timestamp to avoid expensive deep comparison
+watch(
+  () => props.poseData?.timestamp,
+  () => {
+    if (props.poseData) drawSkeleton()
+  }
+)
 
 onMounted(() => {
   drawSkeleton()

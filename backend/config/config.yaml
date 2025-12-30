@@ -33,13 +33,14 @@ redis:
   db: 0
   password: ""  # Set via environment variable: REDIS_PASSWORD
 
-# === Pose Detection Settings ===
+# === Pose Detection Settings (RTMPose - GPU Accelerated) ===
 pose:
-  engine: "mediapipe"
-  model_complexity: 1  # 0=Lite, 1=Full, 2=Heavy
-  min_detection_confidence: 0.5
-  min_tracking_confidence: 0.5
-  enable_segmentation: false
+  engine: "rtmpose"
+  device: "cuda:0"  # cuda:0, cuda:1, or cpu
+  det_score_thr: 0.3  # Person detection confidence threshold
+  pose_score_thr: 0.3  # Pose keypoint confidence threshold
+  max_persons: 5  # Maximum number of persons to detect
+  model_size: "m"  # s=small, m=medium (recommended), l=large
 
 # === Brace Position Detection ===
 brace_position:

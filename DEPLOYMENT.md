@@ -42,11 +42,18 @@
 | 摄像头 | 1080P 30fps 以上 |
 | 网络 | 稳定互联网连接（用于语音识别和AI分析API）|
 
-### GPU 加速说明
+### GPU 加速说明（必需）
 
-- **无独立显卡**：系统使用 CPU 进行 MediaPipe 姿态检测，性能足够日常使用
-- **有 NVIDIA 显卡**：可安装 CUDA 版本 PyTorch 获得更好性能
-- **CUDA 版本要求**：CUDA 11.8 或 12.1
+> **重要**: 本系统使用 RTMPose (MMPose) 进行姿态检测，**必须有 NVIDIA GPU**。
+
+| 配置 | 预期性能 |
+|------|---------|
+| RTX 3090 (24GB) | 单人 80 FPS，3人 60 FPS |
+| RTX 4070 Laptop (8GB) | 单人 45 FPS，3人 35 FPS |
+| RTX 3060 (12GB) | 单人 50 FPS，3人 40 FPS |
+
+- **CUDA 版本要求**：CUDA 12.x（推荐 12.1+）
+- **显存要求**：至少 4GB（推荐 8GB+）
 
 ---
 
@@ -247,7 +254,26 @@ AI-Monitor-CSA/
 
 ## 5. 后端环境配置
 
-### 5.1 安装 Python 依赖
+### 5.1 安装 Python 依赖（推荐方式）
+
+使用一键安装脚本，自动处理版本冲突和安装顺序：
+
+```bash
+# 确保激活 conda 环境
+conda activate cc-sop
+
+# 进入项目目录
+cd ~/Project/AI-Monitor-CSA
+
+# 运行安装脚本（自动卸载旧版本，按顺序安装新版本）
+./scripts/install_deps.sh
+```
+
+> **脚本功能**: 自动卸载冲突包 (torch/mediapipe/mmpose) → 安装 PyTorch CUDA 版 → 按顺序安装 MMPose 生态 → 安装其他依赖 → 验证安装
+
+---
+
+### 5.1.1 手动安装（如需分步执行）
 
 ```bash
 # 确保激活 conda 环境
@@ -256,29 +282,80 @@ conda activate cc-sop
 # 进入后端目录
 cd ~/Project/AI-Monitor-CSA/backend
 
-# 安装依赖
+# 安装基础依赖
 pip install -r requirements.txt
 ```
 
-### 5.2 PyTorch GPU 版本（可选）
+### 5.2 安装 PyTorch with CUDA（必需）
 
-如果有 NVIDIA 显卡并希望使用 GPU 加速：
+本系统使用 RTMPose (MMPose) 进行姿态检测，**必须安装 GPU 版本 PyTorch**：
 
 ```bash
-# 卸载 CPU 版本
+# 确保已激活 conda 环境
+conda activate cc-sop
+
+# 卸载旧版本 PyTorch（如果存在）
 pip uninstall torch torchvision torchaudio -y
 
-# 安装 CUDA 11.8 版本
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-
-# 或 CUDA 12.1 版本
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# 安装 PyTorch with CUDA 12.1（兼容 MMPose 预编译包）
+pip install torch==2.1.0+cu121 torchvision==0.16.0+cu121 \
+    --index-url https://download.pytorch.org/whl/cu121
 
 # 验证 GPU 是否可用
-python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+python -c "import torch; print(f'版本: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0)}')"
 ```
 
-### 5.3 配置环境变量
+> **注意**: 如果不先卸载旧版本，可能会出现版本冲突或误装 CPU 版本的问题。
+
+### 5.3 安装 MMPose 生态（按顺序）
+
+RTMPose 依赖 MMPose 生态，**必须按以下顺序安装**：
+
+```bash
+# 0. 升级构建工具
+pip install --upgrade pip setuptools wheel
+
+# 1. 安装 OpenMIM (MM生态包管理器)
+pip install openmim==0.3.9
+
+# 2. 安装 MMEngine (核心工具库)
+mim install mmengine==0.10.2
+
+# 3. 安装 MMCV (计算机视觉工具库) - 使用预编译包
+pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
+
+# 4. 安装 MMDetection (人体检测器)
+mim install mmdet==3.2.0
+
+# 5. 安装 MMPose (姿态估计) - 跳过可选依赖 chumpy
+pip install mmpose==1.3.1 --no-deps
+pip install munkres scipy matplotlib json-tricks
+# xtcocotools 需要从源码编译以匹配 numpy 版本
+pip install xtcocotools --no-cache-dir --no-binary xtcocotools --no-build-isolation --force-reinstall
+```
+
+> **注意**:
+> - 使用 `--no-deps` 跳过 `chumpy` 包（SMPL人体模型依赖），RTMPose 姿态检测不需要它
+> - `xtcocotools` 需要 `--force-reinstall` 以避免与 numpy 版本不兼容
+
+### 5.4 验证 MMPose 安装
+
+```bash
+python -c "
+import torch
+print(f'PyTorch: {torch.__version__}')
+print(f'CUDA available: {torch.cuda.is_available()}')
+print(f'GPU: {torch.cuda.get_device_name(0)}')
+
+from mmpose.apis import init_model
+from mmdet.apis import init_detector
+print('MMPose/MMDet 安装成功!')
+"
+```
+
+> **注意**: 首次运行姿态检测时，模型权重会自动从 OpenMMLab 下载（约 200MB）
+
+### 5.5 配置环境变量
 
 创建或编辑 `backend/.env` 文件：
 
@@ -307,12 +384,15 @@ OPENAI_MODEL=qwen-plus
 EOF
 ```
 
-### 5.4 验证后端配置
+### 5.6 验证后端配置
 
 ```bash
 # 测试导入是否正常
 cd ~/Project/AI-Monitor-CSA/backend
 python -c "from src.main import app; print('Backend imports OK')"
+
+# 运行姿态检测基准测试
+python scripts/benchmark_pose.py --device cuda:0 --num-frames 50
 ```
 
 ---
@@ -500,7 +580,7 @@ chmod +x ~/Project/AI-Monitor-CSA/start.sh
 │  │  │           后端服务 (FastAPI)                │  │  │
 │  │  │  - 接收视频帧 (WebSocket)                  │  │  │
 │  │  │  - 接收音频流 (WebSocket)                  │  │  │
-│  │  │  - MediaPipe 姿态检测                      │  │  │
+│  │  │  - RTMPose 姿态检测 (GPU加速)            │  │  │
 │  │  │  - 豆包 ASR 语音识别                       │  │  │
 │  │  └────────────────────────────────────────────┘  │  │
 │  └──────────────────────────────────────────────────┘  │
@@ -526,11 +606,33 @@ chmod +x ~/Project/AI-Monitor-CSA/start.sh
 - `localhost` 被浏览器视为安全上下文，允许访问媒体设备
 - 如需远程访问，需配置 HTTPS
 
-### Q2: MediaPipe 报错 "libGL error"
+### Q2: MMPose/MMCV 安装失败
 
 ```bash
-# 安装 OpenGL 依赖
-sudo apt install -y libgl1-mesa-glx libgl1-mesa-dev
+# 确保按顺序安装 MM 生态
+pip install openmim==0.3.9
+mim install mmengine==0.10.2
+# 使用预编译的 mmcv 包（带 CUDA 扩展）
+pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
+mim install mmdet==3.2.0
+pip install mmpose==1.3.1 --no-deps
+pip install munkres scipy matplotlib json-tricks
+pip install xtcocotools --no-cache-dir --no-binary xtcocotools --no-build-isolation
+```
+
+### Q2.1: CUDA 不可用
+
+```bash
+# 检查 CUDA 版本
+nvidia-smi
+
+# 验证 PyTorch CUDA
+python -c "import torch; print(torch.cuda.is_available())"
+
+# 如果返回 False，重新安装 PyTorch GPU 版本
+pip uninstall torch torchvision -y
+pip install torch==2.1.0+cu121 torchvision==0.16.0+cu121 \
+    --index-url https://download.pytorch.org/whl/cu121
 ```
 
 ### Q3: 端口被占用
@@ -610,8 +712,12 @@ conda activate cc-sop
 | Node.js | 20 LTS |
 | FastAPI | 0.100+ |
 | Vue | 3.5+ |
-| MediaPipe | 0.10.14 |
-| PyTorch | 2.0+ |
+| PyTorch | 2.1.0 (CUDA 12.1) |
+| MMPose | 1.3.1 |
+| MMDetection | 3.2.0 |
+| MMCV | 2.1.0 |
+| numpy | 1.24.4 |
+| opencv-python | 4.8.1.78 |
 
 ---
 

@@ -3,10 +3,11 @@ Perception Module - Pose Detection and Speech Recognition.
 
 This module provides pose detection and ASR capabilities:
 
-Pose Detection:
+Pose Detection (COCO 17-point format):
     - PoseDetector: Abstract base class for pose detectors
-    - MediaPipePose: MediaPipe-based pose detection
-    - PoseResult: Result container for pose detection
+    - RTMPoseDetector: GPU-accelerated multi-person pose detection (MMPose)
+    - MultiPersonPoseResult: Result container for multi-person detection
+    - PoseResult: Result container for single-person pose detection
     - Landmark: Single body landmark with coordinates
     - JointAngles: Calculated joint angles
 
@@ -18,13 +19,20 @@ Speech Recognition:
     - ASRSegment: Single transcribed segment
 
 Usage:
-    from src.perception import MediaPipePose, PoseResult
+    from src.perception import RTMPoseDetector, PoseResult
 
-    with MediaPipePose() as detector:
+    # Single person detection
+    with RTMPoseDetector(device='cuda:0') as detector:
         result = detector.detect(frame)
         if result.detected:
             for landmark in result.landmarks:
                 print(f"({landmark.x:.3f}, {landmark.y:.3f})")
+
+    # Multi-person detection
+    with RTMPoseDetector() as detector:
+        multi_result = detector.detect_multi(frame)
+        for pose in multi_result.poses:
+            print(f"Person confidence: {pose.confidence}")
 
     # Streaming ASR
     from src.perception import DoubaoStreamingSession
@@ -49,15 +57,19 @@ from .doubao_asr_engine import (
     DoubaoResponse,
     DoubaoStreamingSession,
 )
-from .mediapipe_pose import MediaPipePose
 from .pose_detector import (
     BodyPart,
     JointAngles,
     Landmark,
+    NUM_KEYPOINTS,
     POSE_CONNECTIONS,
     PoseDetector,
     PoseResult,
     PoseType,
+)
+from .rtmpose_detector import (
+    MultiPersonPoseResult,
+    RTMPoseDetector,
 )
 
 __all__ = [
@@ -69,8 +81,10 @@ __all__ = [
     "PoseType",
     "BodyPart",
     "POSE_CONNECTIONS",
-    # Pose Detection - Implementations
-    "MediaPipePose",
+    "NUM_KEYPOINTS",
+    # Pose Detection - RTMPose Implementation
+    "RTMPoseDetector",
+    "MultiPersonPoseResult",
     # ASR - Base classes
     "ASREngine",
     "ASRResult",

@@ -11,7 +11,8 @@
 | Node.js | >= 18 |
 | PostgreSQL | >= 14 |
 | Redis | >= 6 |
-| CUDA | >= 11.8 (可选，GPU加速) |
+| GPU | NVIDIA RTX 3060+ (**必需**) |
+| CUDA | >= 12.0 (推荐 12.4) |
 
 ### 1.2 Python环境配置
 
@@ -99,11 +100,13 @@ asr:
   language: "zh"
   device: "cuda"  # 或 "cpu"
 
-# 姿态检测配置
+# 姿态检测配置 (RTMPose)
 pose:
-  engine: "mediapipe"
-  confidence_threshold: 0.5
-  tracking_confidence: 0.5
+  engine: "rtmpose"
+  device: "cuda:0"
+  det_score_thr: 0.3
+  pose_score_thr: 0.3
+  max_persons: 5
 
 # 动作识别配置
 action:
@@ -263,11 +266,11 @@ npm run format
 
 **示例**:
 ```
-feat(pose): 添加MediaPipe姿态检测模块
+feat(pose): 迁移到RTMPose姿态检测模块
 
-- 实现33个关键点检测
-- 添加关节角度计算
-- 支持标准姿态比对
+- 实现COCO 17关键点检测
+- 支持多人检测(最多5人)
+- GPU加速推理
 
 Closes #12
 ```
@@ -587,8 +590,13 @@ npm run build
 
 ## 9. 常见问题
 
-### Q1: MediaPipe初始化失败
-**A**: 确保安装了正确版本的 mediapipe，并检查是否有足够的系统权限。
+### Q1: RTMPose/MMPose 初始化失败
+**A**: 确保按顺序安装了 MMPose 生态依赖，并验证 CUDA 是否可用：
+```bash
+pip install openmim==0.3.9
+mim install mmengine mmcv mmdet mmpose
+python -c "import torch; print(torch.cuda.is_available())"
+```
 
 ### Q2: Whisper模型加载慢
 **A**: 首次加载会下载模型，后续会使用缓存。可以预先运行下载脚本。

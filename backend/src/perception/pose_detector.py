@@ -2,11 +2,12 @@
 Pose Detector - Abstract base class for pose detection.
 
 Defines the interface for all pose detection implementations.
+Uses COCO 17-point keypoint format for RTMPose compatibility.
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import IntEnum, Enum
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -23,47 +24,39 @@ class PoseType(Enum):
     BRACE_POSITION = "brace_position"
 
 
-class BodyPart(Enum):
-    """Body part identifiers for MediaPipe 33-point model."""
+class BodyPart(IntEnum):
+    """
+    Body part identifiers for COCO 17-point model.
 
-    # Face
+    Used by RTMPose and other COCO-format pose estimators.
+    """
+
+    # Head
     NOSE = 0
-    LEFT_EYE_INNER = 1
-    LEFT_EYE = 2
-    LEFT_EYE_OUTER = 3
-    RIGHT_EYE_INNER = 4
-    RIGHT_EYE = 5
-    RIGHT_EYE_OUTER = 6
-    LEFT_EAR = 7
-    RIGHT_EAR = 8
-    MOUTH_LEFT = 9
-    MOUTH_RIGHT = 10
+    LEFT_EYE = 1
+    RIGHT_EYE = 2
+    LEFT_EAR = 3
+    RIGHT_EAR = 4
 
     # Upper body
-    LEFT_SHOULDER = 11
-    RIGHT_SHOULDER = 12
-    LEFT_ELBOW = 13
-    RIGHT_ELBOW = 14
-    LEFT_WRIST = 15
-    RIGHT_WRIST = 16
-    LEFT_PINKY = 17
-    RIGHT_PINKY = 18
-    LEFT_INDEX = 19
-    RIGHT_INDEX = 20
-    LEFT_THUMB = 21
-    RIGHT_THUMB = 22
+    LEFT_SHOULDER = 5
+    RIGHT_SHOULDER = 6
+    LEFT_ELBOW = 7
+    RIGHT_ELBOW = 8
+    LEFT_WRIST = 9
+    RIGHT_WRIST = 10
 
     # Lower body
-    LEFT_HIP = 23
-    RIGHT_HIP = 24
-    LEFT_KNEE = 25
-    RIGHT_KNEE = 26
-    LEFT_ANKLE = 27
-    RIGHT_ANKLE = 28
-    LEFT_HEEL = 29
-    RIGHT_HEEL = 30
-    LEFT_FOOT_INDEX = 31
-    RIGHT_FOOT_INDEX = 32
+    LEFT_HIP = 11
+    RIGHT_HIP = 12
+    LEFT_KNEE = 13
+    RIGHT_KNEE = 14
+    LEFT_ANKLE = 15
+    RIGHT_ANKLE = 16
+
+
+# Total number of keypoints in COCO format
+NUM_KEYPOINTS = 17
 
 
 @dataclass
@@ -128,7 +121,7 @@ class PoseResult:
     detected: bool  # Whether a pose was detected
     confidence: float  # Overall detection confidence (0-1)
 
-    # Landmarks (33 points for MediaPipe)
+    # Landmarks (17 points for COCO format / RTMPose)
     landmarks: List[Landmark] = field(default_factory=list)
 
     # Calculated values
@@ -146,13 +139,13 @@ class PoseResult:
         return None
 
     def get_landmarks_array(self) -> np.ndarray:
-        """Get all landmarks as numpy array (33, 3)."""
+        """Get all landmarks as numpy array (17, 3) for COCO format."""
         if not self.landmarks:
             return np.array([])
         return np.array([[lm.x, lm.y, lm.z] for lm in self.landmarks])
 
     def get_visibility_array(self) -> np.ndarray:
-        """Get visibility scores as numpy array (33,)."""
+        """Get visibility scores as numpy array (17,) for COCO format."""
         if not self.landmarks:
             return np.array([])
         return np.array([lm.visibility for lm in self.landmarks])
@@ -163,9 +156,10 @@ class PoseDetector(ABC):
     Abstract base class for pose detectors.
 
     All pose detection implementations must inherit from this class.
+    Uses COCO 17-point keypoint format.
 
     Usage:
-        detector = MediaPipePose()
+        detector = RTMPoseDetector()
         result = detector.detect(frame)
         if result.detected:
             for landmark in result.landmarks:
@@ -208,45 +202,29 @@ class PoseDetector(ABC):
         self.release()
 
 
-# Skeleton connection definitions for visualization
+# Skeleton connection definitions for visualization (COCO 17-point format)
 POSE_CONNECTIONS: List[Tuple[BodyPart, BodyPart]] = [
-    # Face
-    (BodyPart.NOSE, BodyPart.LEFT_EYE_INNER),
-    (BodyPart.LEFT_EYE_INNER, BodyPart.LEFT_EYE),
-    (BodyPart.LEFT_EYE, BodyPart.LEFT_EYE_OUTER),
-    (BodyPart.LEFT_EYE_OUTER, BodyPart.LEFT_EAR),
-    (BodyPart.NOSE, BodyPart.RIGHT_EYE_INNER),
-    (BodyPart.RIGHT_EYE_INNER, BodyPart.RIGHT_EYE),
-    (BodyPart.RIGHT_EYE, BodyPart.RIGHT_EYE_OUTER),
-    (BodyPart.RIGHT_EYE_OUTER, BodyPart.RIGHT_EAR),
-    (BodyPart.MOUTH_LEFT, BodyPart.MOUTH_RIGHT),
-    # Upper body
+    # Head connections
+    (BodyPart.NOSE, BodyPart.LEFT_EYE),
+    (BodyPart.NOSE, BodyPart.RIGHT_EYE),
+    (BodyPart.LEFT_EYE, BodyPart.LEFT_EAR),
+    (BodyPart.RIGHT_EYE, BodyPart.RIGHT_EAR),
+    # Upper body - shoulders
     (BodyPart.LEFT_SHOULDER, BodyPart.RIGHT_SHOULDER),
+    # Left arm
     (BodyPart.LEFT_SHOULDER, BodyPart.LEFT_ELBOW),
     (BodyPart.LEFT_ELBOW, BodyPart.LEFT_WRIST),
-    (BodyPart.LEFT_WRIST, BodyPart.LEFT_PINKY),
-    (BodyPart.LEFT_WRIST, BodyPart.LEFT_INDEX),
-    (BodyPart.LEFT_WRIST, BodyPart.LEFT_THUMB),
-    (BodyPart.LEFT_PINKY, BodyPart.LEFT_INDEX),
+    # Right arm
     (BodyPart.RIGHT_SHOULDER, BodyPart.RIGHT_ELBOW),
     (BodyPart.RIGHT_ELBOW, BodyPart.RIGHT_WRIST),
-    (BodyPart.RIGHT_WRIST, BodyPart.RIGHT_PINKY),
-    (BodyPart.RIGHT_WRIST, BodyPart.RIGHT_INDEX),
-    (BodyPart.RIGHT_WRIST, BodyPart.RIGHT_THUMB),
-    (BodyPart.RIGHT_PINKY, BodyPart.RIGHT_INDEX),
     # Torso
     (BodyPart.LEFT_SHOULDER, BodyPart.LEFT_HIP),
     (BodyPart.RIGHT_SHOULDER, BodyPart.RIGHT_HIP),
     (BodyPart.LEFT_HIP, BodyPart.RIGHT_HIP),
-    # Lower body
+    # Left leg
     (BodyPart.LEFT_HIP, BodyPart.LEFT_KNEE),
     (BodyPart.LEFT_KNEE, BodyPart.LEFT_ANKLE),
-    (BodyPart.LEFT_ANKLE, BodyPart.LEFT_HEEL),
-    (BodyPart.LEFT_ANKLE, BodyPart.LEFT_FOOT_INDEX),
-    (BodyPart.LEFT_HEEL, BodyPart.LEFT_FOOT_INDEX),
+    # Right leg
     (BodyPart.RIGHT_HIP, BodyPart.RIGHT_KNEE),
     (BodyPart.RIGHT_KNEE, BodyPart.RIGHT_ANKLE),
-    (BodyPart.RIGHT_ANKLE, BodyPart.RIGHT_HEEL),
-    (BodyPart.RIGHT_ANKLE, BodyPart.RIGHT_FOOT_INDEX),
-    (BodyPart.RIGHT_HEEL, BodyPart.RIGHT_FOOT_INDEX),
 ]

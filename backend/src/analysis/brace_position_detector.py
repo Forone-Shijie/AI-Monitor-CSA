@@ -20,6 +20,7 @@ import numpy as np
 from src.perception.pose_detector import (
     BodyPart,
     Landmark,
+    NUM_KEYPOINTS,
     PoseResult,
 )
 
@@ -226,8 +227,8 @@ class BracePositionDetector:
         """
         timestamp = time.time()
 
-        # Check if pose was detected
-        if not pose_result.detected or len(pose_result.landmarks) < 33:
+        # Check if pose was detected (COCO 17-point format)
+        if not pose_result.detected or len(pose_result.landmarks) < NUM_KEYPOINTS:
             return self._create_empty_result(timestamp)
 
         # Analyze each body part

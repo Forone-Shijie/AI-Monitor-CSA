@@ -1,7 +1,8 @@
 """
 Unit tests for pose detection module.
 
-Tests PoseDetector, MediaPipePose and related classes.
+Tests PoseDetector, RTMPoseDetector and related classes.
+Uses COCO 17-point keypoint format.
 """
 
 from unittest.mock import MagicMock, patch
@@ -13,6 +14,7 @@ from src.perception.pose_detector import (
     BodyPart,
     JointAngles,
     Landmark,
+    NUM_KEYPOINTS,
     POSE_CONNECTIONS,
     PoseResult,
     PoseType,
@@ -86,10 +88,10 @@ class TestPoseResult:
 
     @pytest.fixture
     def sample_landmarks(self):
-        """Create sample landmarks (33 points)."""
+        """Create sample landmarks (17 points for COCO format)."""
         return [
-            Landmark(x=i * 0.03, y=i * 0.03, z=0.0, visibility=0.9)
-            for i in range(33)
+            Landmark(x=i * 0.05, y=i * 0.05, z=0.0, visibility=0.9)
+            for i in range(NUM_KEYPOINTS)
         ]
 
     def test_pose_result_detected(self, sample_landmarks):
@@ -105,7 +107,7 @@ class TestPoseResult:
 
         assert result.detected is True
         assert result.confidence == 0.85
-        assert len(result.landmarks) == 33
+        assert len(result.landmarks) == NUM_KEYPOINTS
         assert result.pose_type == PoseType.STANDING
 
     def test_pose_result_not_detected(self):
@@ -120,7 +122,7 @@ class TestPoseResult:
         assert len(result.landmarks) == 0
 
     def test_get_landmark(self, sample_landmarks):
-        """Test getting landmark by body part."""
+        """Test getting landmark by body part (COCO 17-point format)."""
         result = PoseResult(
             detected=True,
             confidence=0.9,
@@ -129,11 +131,17 @@ class TestPoseResult:
 
         nose = result.get_landmark(BodyPart.NOSE)
         assert nose is not None
-        assert nose.x == 0.0  # First landmark
+        assert nose.x == 0.0  # Index 0
 
+        # LEFT_SHOULDER is index 5 in COCO format
         left_shoulder = result.get_landmark(BodyPart.LEFT_SHOULDER)
         assert left_shoulder is not None
-        assert left_shoulder.x == 11 * 0.03  # Index 11
+        assert left_shoulder.x == 5 * 0.05
+
+        # LEFT_HIP is index 11 in COCO format
+        left_hip = result.get_landmark(BodyPart.LEFT_HIP)
+        assert left_hip is not None
+        assert left_hip.x == 11 * 0.05
 
     def test_get_landmarks_array(self, sample_landmarks):
         """Test getting landmarks as numpy array."""
@@ -146,7 +154,7 @@ class TestPoseResult:
         arr = result.get_landmarks_array()
 
         assert isinstance(arr, np.ndarray)
-        assert arr.shape == (33, 3)
+        assert arr.shape == (NUM_KEYPOINTS, 3)
 
     def test_get_visibility_array(self, sample_landmarks):
         """Test getting visibility scores."""
@@ -159,7 +167,7 @@ class TestPoseResult:
         vis = result.get_visibility_array()
 
         assert isinstance(vis, np.ndarray)
-        assert len(vis) == 33
+        assert len(vis) == NUM_KEYPOINTS
         assert all(v == 0.9 for v in vis)
 
 
@@ -177,26 +185,41 @@ class TestPoseType:
 
 
 class TestBodyPart:
-    """Tests for BodyPart enum."""
+    """Tests for BodyPart enum (COCO 17-point format)."""
 
     def test_body_part_values(self):
-        """Test body part index values."""
+        """Test body part index values (COCO 17-point)."""
+        # Head
         assert BodyPart.NOSE.value == 0
-        assert BodyPart.LEFT_SHOULDER.value == 11
-        assert BodyPart.RIGHT_SHOULDER.value == 12
-        assert BodyPart.LEFT_HIP.value == 23
-        assert BodyPart.RIGHT_HIP.value == 24
-        assert BodyPart.LEFT_KNEE.value == 25
-        assert BodyPart.RIGHT_ANKLE.value == 28
+        assert BodyPart.LEFT_EYE.value == 1
+        assert BodyPart.RIGHT_EYE.value == 2
+        assert BodyPart.LEFT_EAR.value == 3
+        assert BodyPart.RIGHT_EAR.value == 4
+
+        # Upper body
+        assert BodyPart.LEFT_SHOULDER.value == 5
+        assert BodyPart.RIGHT_SHOULDER.value == 6
+        assert BodyPart.LEFT_ELBOW.value == 7
+        assert BodyPart.RIGHT_ELBOW.value == 8
+        assert BodyPart.LEFT_WRIST.value == 9
+        assert BodyPart.RIGHT_WRIST.value == 10
+
+        # Lower body
+        assert BodyPart.LEFT_HIP.value == 11
+        assert BodyPart.RIGHT_HIP.value == 12
+        assert BodyPart.LEFT_KNEE.value == 13
+        assert BodyPart.RIGHT_KNEE.value == 14
+        assert BodyPart.LEFT_ANKLE.value == 15
+        assert BodyPart.RIGHT_ANKLE.value == 16
 
     def test_body_part_count(self):
-        """Test total number of body parts."""
-        # MediaPipe has 33 landmarks
-        assert len(BodyPart) == 33
+        """Test total number of body parts (COCO 17)."""
+        assert len(BodyPart) == NUM_KEYPOINTS
+        assert NUM_KEYPOINTS == 17
 
 
 class TestPoseConnections:
-    """Tests for pose connections."""
+    """Tests for pose connections (COCO 17-point format)."""
 
     def test_pose_connections_exist(self):
         """Test that pose connections are defined."""
@@ -207,107 +230,95 @@ class TestPoseConnections:
         for start, end in POSE_CONNECTIONS:
             assert isinstance(start, BodyPart)
             assert isinstance(end, BodyPart)
-            assert start.value < 33
-            assert end.value < 33
+            assert start.value < NUM_KEYPOINTS
+            assert end.value < NUM_KEYPOINTS
+
+    def test_pose_connections_count(self):
+        """Test expected number of connections for COCO 17-point."""
+        # COCO skeleton has 16 connections
+        assert len(POSE_CONNECTIONS) == 16
 
 
-class TestMediaPipePose:
-    """Tests for MediaPipePose class."""
+class TestRTMPoseDetector:
+    """Tests for RTMPoseDetector class."""
 
     @pytest.fixture
-    def mock_mediapipe(self):
-        """Create mock MediaPipe module."""
-        with patch.dict("sys.modules", {"mediapipe": MagicMock()}):
-            import sys
+    def mock_mmpose(self):
+        """Create mock MMPose modules."""
+        mock_torch = MagicMock()
+        mock_torch.cuda.is_available.return_value = False
 
-            mp = sys.modules["mediapipe"]
+        mock_mmdet = MagicMock()
+        mock_mmpose = MagicMock()
 
-            # Mock solutions.pose
-            mock_pose_class = MagicMock()
-            mp.solutions.pose = MagicMock()
-            mp.solutions.pose.Pose = mock_pose_class
-            mp.solutions.drawing_utils = MagicMock()
+        # Mock detector
+        mock_detector = MagicMock()
+        mock_mmdet.apis.init_detector.return_value = mock_detector
 
-            # Create mock pose instance
-            mock_pose = MagicMock()
-            mock_pose_class.return_value = mock_pose
+        # Mock pose estimator
+        mock_pose_estimator = MagicMock()
+        mock_mmpose.apis.init_model.return_value = mock_pose_estimator
 
-            # Mock landmarks result
-            mock_landmarks = MagicMock()
-            mock_landmarks.landmark = [
-                MagicMock(x=i * 0.03, y=i * 0.03, z=0.0, visibility=0.9)
-                for i in range(33)
-            ]
+        # Mock detection result
+        mock_det_result = MagicMock()
+        mock_pred_instances = MagicMock()
+        mock_pred_instances.bboxes = MagicMock()
+        mock_pred_instances.bboxes.cpu.return_value.numpy.return_value = np.array(
+            [[100, 100, 200, 400]]
+        )
+        mock_pred_instances.scores = MagicMock()
+        mock_pred_instances.scores.cpu.return_value.numpy.return_value = np.array(
+            [0.9]
+        )
+        mock_pred_instances.labels = MagicMock()
+        mock_pred_instances.labels.cpu.return_value.numpy.return_value = np.array([0])
+        mock_det_result.pred_instances = mock_pred_instances
+        mock_mmdet.apis.inference_detector.return_value = mock_det_result
 
-            mock_result = MagicMock()
-            mock_result.pose_landmarks = mock_landmarks
-            mock_pose.process.return_value = mock_result
+        # Mock pose result
+        mock_pose_result = MagicMock()
+        mock_pose_instances = MagicMock()
+        mock_pose_instances.keypoints = np.array(
+            [[[i * 10, i * 10] for i in range(17)]]
+        )
+        mock_pose_instances.keypoint_scores = np.array([[0.9] * 17])
+        mock_pose_result.pred_instances = mock_pose_instances
+        mock_mmpose.apis.inference_topdown.return_value = [mock_pose_result]
 
-            yield mp, mock_pose
+        with patch.dict(
+            "sys.modules",
+            {
+                "torch": mock_torch,
+                "mmdet": mock_mmdet,
+                "mmdet.apis": mock_mmdet.apis,
+                "mmpose": mock_mmpose,
+                "mmpose.apis": mock_mmpose.apis,
+            },
+        ):
+            yield mock_torch, mock_mmdet, mock_mmpose
 
-    def test_mediapipe_init(self, mock_mediapipe):
-        """Test MediaPipePose initialization."""
-        from src.perception.mediapipe_pose import MediaPipePose
+    def test_rtmpose_initialization(self):
+        """Test RTMPoseDetector initializes successfully with MMPose installed."""
+        try:
+            from src.perception.rtmpose_detector import RTMPoseDetector
 
-        detector = MediaPipePose(model_complexity=1)
+            detector = RTMPoseDetector(device="cpu")
+            assert detector._is_initialized is True
+            detector.release()
+        except ImportError:
+            pytest.skip("MMPose not installed")
 
-        assert detector.is_initialized
-        assert detector.model_complexity == 1
 
-    def test_mediapipe_detect(self, mock_mediapipe):
-        """Test pose detection."""
-        from src.perception.mediapipe_pose import MediaPipePose
+class TestNumKeypoints:
+    """Tests for NUM_KEYPOINTS constant."""
 
-        detector = MediaPipePose()
+    def test_num_keypoints_value(self):
+        """Test NUM_KEYPOINTS is 17 (COCO format)."""
+        assert NUM_KEYPOINTS == 17
 
-        # Create test frame
-        frame = np.zeros((480, 640, 3), dtype=np.uint8)
-
-        result = detector.detect(frame)
-
-        assert result.detected is True
-        assert len(result.landmarks) == 33
-        assert result.angles is not None
-
-    def test_mediapipe_no_detection(self, mock_mediapipe):
-        """Test when no pose is detected."""
-        from src.perception.mediapipe_pose import MediaPipePose
-
-        mp, mock_pose = mock_mediapipe
-
-        # Configure mock to return no landmarks
-        mock_result = MagicMock()
-        mock_result.pose_landmarks = None
-        mock_pose.process.return_value = mock_result
-
-        detector = MediaPipePose()
-        frame = np.zeros((480, 640, 3), dtype=np.uint8)
-
-        result = detector.detect(frame)
-
-        assert result.detected is False
-        assert len(result.landmarks) == 0
-
-    def test_mediapipe_context_manager(self, mock_mediapipe):
-        """Test MediaPipePose as context manager."""
-        from src.perception.mediapipe_pose import MediaPipePose
-
-        with MediaPipePose() as detector:
-            assert detector.is_initialized
-
-        # After exit, should be released
-        assert not detector.is_initialized
-
-    def test_mediapipe_release(self, mock_mediapipe):
-        """Test releasing resources."""
-        from src.perception.mediapipe_pose import MediaPipePose
-
-        detector = MediaPipePose()
-        assert detector.is_initialized
-
-        detector.release()
-
-        assert not detector.is_initialized
+    def test_num_keypoints_matches_body_part_count(self):
+        """Test NUM_KEYPOINTS matches BodyPart enum count."""
+        assert NUM_KEYPOINTS == len(BodyPart)
 
 
 if __name__ == "__main__":

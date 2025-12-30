@@ -11,13 +11,20 @@ CC-SOP Monitor (客舱乘务员姿态与操作规范监测系统) - An AI traini
 ## Technology Stack
 
 - **Backend**: Python 3.10+, FastAPI
-- **Pose Detection**: MediaPipe Pose (33 keypoints)
+- **Pose Detection**: RTMPose-M (MMPose, COCO 17 keypoints, GPU accelerated)
 - **Action Recognition**: ST-GCN + LSTM
 - **Speech Recognition**: Doubao ASR API (primary) / Whisper (local fallback)
 - **Database**: PostgreSQL + Redis
 - **Frontend**: Vue 3 + TypeScript, Vite
 - **UI Components**: Element Plus
 - **Visualization**: ECharts + Three.js (3D skeleton)
+
+## GPU Requirements
+
+- **Minimum**: NVIDIA GPU with 4GB+ VRAM (RTX 2060 or higher)
+- **Recommended**: RTX 3090 (24GB) or RTX 4070 Laptop (8GB)
+- **CUDA**: 12.x
+- **Performance**: 30+ FPS for 3-person detection on RTX 4070 Laptop
 
 ## Development Commands
 
@@ -78,7 +85,7 @@ The system follows a layered pipeline architecture:
 Input Layer (Video/Audio) → Synchronizer (Multi-modal Alignment)
     ↓
 Perception Layer
-├── PoseDetector (MediaPipe) → keypoints, angles, pose_type
+├── PoseDetector (RTMPose) → COCO 17 keypoints, angles, pose_type
 ├── ActionRecognizer (ST-GCN) → action events with timestamps
 └── ASR (Doubao/Whisper) → transcribed text with timestamps
     ↓
@@ -101,7 +108,7 @@ Output Layer
 
 All perception modules use abstract base classes with concrete implementations:
 - `VideoSource` (base) → `CameraInput`, `RTSPInput`, `FileInput`
-- `PoseDetector` (base) → `MediaPipePose`
+- `PoseDetector` (base) → `RTMPoseDetector` (GPU, multi-person, COCO 17-point)
 - `ActionRecognizer` (base) → `STGCNRecognizer`
 - `ASREngine` (base) → `DoubaoASR`, `WhisperASR`
 

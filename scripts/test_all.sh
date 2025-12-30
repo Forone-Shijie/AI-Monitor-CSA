@@ -29,7 +29,7 @@ echo ""
 
 # 检查 conda 环境
 check_conda() {
-    echo -e "${YELLOW}[1/6] 检查 Conda 环境...${NC}"
+    echo -e "${YELLOW}[1/7] 检查 Conda 环境...${NC}"
     if [ -f "$PYTHON" ]; then
         echo -e "${GREEN}  ✓ Conda 环境 '$CONDA_ENV' 存在${NC}"
         $PYTHON --version
@@ -43,7 +43,7 @@ check_conda() {
 
 # 检查后端依赖
 check_backend_deps() {
-    echo -e "${YELLOW}[2/6] 检查后端依赖...${NC}"
+    echo -e "${YELLOW}[2/7] 检查后端依赖...${NC}"
     cd "$BACKEND_DIR"
 
     # 检查关键包
@@ -62,9 +62,34 @@ check_backend_deps() {
     echo ""
 }
 
+# 检查 GPU 环境 (RTMPose 必需)
+check_gpu() {
+    echo -e "${YELLOW}[3/7] 检查 GPU 环境 (RTMPose 必需)...${NC}"
+
+    # 检查 CUDA 可用性
+    GPU_CHECK=$($PYTHON -c "import torch; print('CUDA' if torch.cuda.is_available() else 'NO_CUDA')" 2>/dev/null)
+    if [ "$GPU_CHECK" = "CUDA" ]; then
+        GPU_NAME=$($PYTHON -c "import torch; print(torch.cuda.get_device_name(0))" 2>/dev/null)
+        echo -e "${GREEN}  ✓ GPU 可用: $GPU_NAME${NC}"
+    else
+        echo -e "${RED}  ✗ CUDA 不可用，RTMPose 需要 GPU${NC}"
+        exit 1
+    fi
+
+    # 检查 MMPose
+    MMPOSE_CHECK=$($PYTHON -c "from mmpose.apis import init_model; print('OK')" 2>/dev/null || echo "FAIL")
+    if [ "$MMPOSE_CHECK" = "OK" ]; then
+        echo -e "${GREEN}  ✓ MMPose 已安装${NC}"
+    else
+        echo -e "${RED}  ✗ MMPose 未安装，请运行: mim install mmpose${NC}"
+        exit 1
+    fi
+    echo ""
+}
+
 # 运行 Phase 1 测试 (视频/音频输入)
 run_phase1_tests() {
-    echo -e "${YELLOW}[3/6] 运行 Phase 1 测试 (视频/音频输入)...${NC}"
+    echo -e "${YELLOW}[4/7] 运行 Phase 1 测试 (视频/音频输入)...${NC}"
     cd "$BACKEND_DIR"
 
     echo -e "  ${BLUE}运行视频输入测试...${NC}"
@@ -75,16 +100,16 @@ run_phase1_tests() {
     $PYTHON -m pytest tests/test_audio_input.py -v --tb=short
 
     echo ""
-    echo -e "${GREEN}  ✓ Phase 1 测试通过 (25 tests)${NC}"
+    echo -e "${GREEN}  ✓ Phase 1 测试通过${NC}"
     echo ""
 }
 
-# 运行 Phase 2 测试 (姿态检测)
+# 运行 Phase 2 测试 (姿态检测 - RTMPose)
 run_phase2_tests() {
-    echo -e "${YELLOW}[4/6] 运行 Phase 2 测试 (姿态检测)...${NC}"
+    echo -e "${YELLOW}[5/7] 运行 Phase 2 测试 (姿态检测 - RTMPose)...${NC}"
     cd "$BACKEND_DIR"
 
-    echo -e "  ${BLUE}运行姿态检测测试...${NC}"
+    echo -e "  ${BLUE}运行姿态检测测试 (COCO 17点)...${NC}"
     $PYTHON -m pytest tests/test_pose_detector.py -v --tb=short
 
     echo ""
@@ -92,13 +117,13 @@ run_phase2_tests() {
     $PYTHON -m pytest tests/test_brace_position.py -v --tb=short
 
     echo ""
-    echo -e "${GREEN}  ✓ Phase 2 测试通过 (43 tests)${NC}"
+    echo -e "${GREEN}  ✓ Phase 2 测试通过${NC}"
     echo ""
 }
 
 # 测试后端服务
 test_backend_server() {
-    echo -e "${YELLOW}[4/5] 测试后端服务...${NC}"
+    echo -e "${YELLOW}[6/7] 测试后端服务...${NC}"
     cd "$BACKEND_DIR"
 
     # 启动后端服务
@@ -130,7 +155,7 @@ test_backend_server() {
 
 # 测试前端构建
 test_frontend_build() {
-    echo -e "${YELLOW}[5/5] 测试前端构建...${NC}"
+    echo -e "${YELLOW}[7/7] 测试前端构建...${NC}"
     cd "$FRONTEND_DIR"
 
     if [ ! -d "node_modules" ]; then
@@ -160,21 +185,27 @@ print_summary() {
     echo -e "已验证内容:"
     echo -e "  ${GREEN}✓${NC} Phase 0: 项目骨架初始化"
     echo -e "  ${GREEN}✓${NC} Phase 1: 视频/音频输入层"
+    echo -e "  ${GREEN}✓${NC} Phase 2: 姿态检测 (RTMPose, COCO 17点)"
     echo ""
     echo -e "测试统计:"
-    echo -e "  - 视频输入测试: 13 passed"
-    echo -e "  - 音频输入测试: 12 passed"
+    echo -e "  - GPU/CUDA 检查: passed"
+    echo -e "  - MMPose 安装检查: passed"
+    echo -e "  - 视频输入测试: passed"
+    echo -e "  - 音频输入测试: passed"
+    echo -e "  - 姿态检测测试: passed"
+    echo -e "  - 防冲击姿势测试: passed"
     echo -e "  - 后端健康检查: passed"
     echo -e "  - 前端构建: passed"
     echo ""
-    echo -e "下一步: Phase 2 姿态检测模块"
 }
 
 # 主流程
 main() {
     check_conda
     check_backend_deps
-    run_backend_tests
+    check_gpu
+    run_phase1_tests
+    run_phase2_tests
     test_backend_server
     test_frontend_build
     print_summary

@@ -69,7 +69,7 @@
 │  ┌─────────────┐       ┌─────────────┐       ┌─────────────┐           │
 │  │  姿态检测   │       │  动作识别   │       │  语音识别   │           │
 │  │PoseDetector │       │ActionRecog  │       │    ASR      │           │
-│  │ MediaPipe   │       │ ST-GCN/CNN  │       │  豆包 ASR   │           │
+│  │ RTMPose-M   │       │ ST-GCN/CNN  │       │  豆包 ASR   │           │
 │  └──────┬──────┘       └──────┬──────┘       └──────┬──────┘           │
 │         │                     │                     │                   │
 │         └─────────────────────┼─────────────────────┘                   │
@@ -124,7 +124,7 @@
 | 模块 | 技术选型 | 备选方案 | 说明 |
 |------|---------|---------|------|
 | **后端框架** | FastAPI | Flask | 高性能异步API |
-| **姿态检测** | MediaPipe Pose | OpenPose | 实时性好，部署简单 |
+| **姿态检测** | RTMPose-M (MMPose) | HRNet-W48 | GPU加速，多人检测 |
 | **动作识别** | ST-GCN + LSTM | SlowFast | 基于骨骼的动作识别 |
 | **语音识别** | 豆包 ASR (bigmodel_async) | - | 火山引擎流式语音识别 |
 | **时序分析** | 自定义规则引擎 | - | 基于SOP标准库 |
@@ -142,7 +142,8 @@
 ### 4.1 姿态检测模块 (PoseDetector)
 
 #### 职责
-- 实时检测人体33个关键点
+- 实时检测人体17个关键点（COCO格式）
+- 支持多人检测（最多5人）
 - 计算关键姿态夹角（如膝关节角度、脊柱弯曲度）
 - 支持标准姿态比对
 
@@ -151,7 +152,7 @@
 @dataclass
 class PoseResult:
     timestamp: float                    # 时间戳
-    keypoints: List[Keypoint]           # 33个关键点
+    keypoints: List[Keypoint]           # 17个关键点 (COCO格式)
     angles: Dict[str, float]            # 关键夹角
     pose_type: str                      # 姿态类型: standing/squatting/bending
     confidence: float                   # 置信度
@@ -400,7 +401,7 @@ AI-Monitor-CSA/
 │   │   │
 │   │   ├── perception/                # 感知层
 │   │   │   ├── pose_detector.py       # 姿态检测基类
-│   │   │   ├── mediapipe_pose.py      # MediaPipe实现
+│   │   │   ├── rtmpose_detector.py    # RTMPose实现 (GPU)
 │   │   │   ├── action_recognizer.py   # 动作识别基类
 │   │   │   ├── stgcn_recognizer.py    # ST-GCN实现
 │   │   │   ├── asr_engine.py          # ASR基类
@@ -598,7 +599,8 @@ class EvaluationResult:
 | **CPU** | 4核 | 8核+ |
 | **内存** | 8GB | 16GB+ |
 | **存储** | 50GB | 100GB+ |
-| **GPU** | 可选 | NVIDIA RTX 3060+ (8GB显存) |
+| **GPU** | NVIDIA RTX 3060 (8GB) | NVIDIA RTX 3090 (24GB) |
+| **CUDA** | 12.0+ | 12.4 |
 
 ---
 

@@ -10,6 +10,7 @@ import asyncio
 import io
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Set
 
 import cv2
@@ -19,7 +20,7 @@ from PIL import Image
 
 from ..schemas import MonitoringFrame, PoseData, SessionStatus, WSMessage
 from ..session_manager import session_manager
-from ...perception.mediapipe_pose import MediaPipePose
+from ...perception.rtmpose_detector import RTMPoseDetector
 
 router = APIRouter(tags=["WebSocket"])
 
@@ -339,26 +340,29 @@ async def broadcast_event(
 
 class FrameProcessor:
     """
-    Process video frames from browser using MediaPipe pose detection.
+    Process video frames from browser using RTMPose (GPU-accelerated).
 
     Maintains a pose detector instance per session for efficient processing.
+    Uses COCO 17-point keypoint format.
     """
 
     def __init__(self) -> None:
         """Initialize frame processor."""
-        self._detectors: Dict[str, MediaPipePose] = {}
+        self._detectors: Dict[str, RTMPoseDetector] = {}
         self._frame_counts: Dict[str, int] = {}
         self._lock = asyncio.Lock()
+        # ThreadPoolExecutor for async inference (avoid blocking event loop)
+        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="rtmpose")
 
-    async def get_detector(self, session_id: str) -> MediaPipePose:
+    async def get_detector(self, session_id: str) -> RTMPoseDetector:
         """Get or create pose detector for session."""
         async with self._lock:
             if session_id not in self._detectors:
-                self._detectors[session_id] = MediaPipePose(
-                    model_complexity=1,
-                    min_detection_confidence=0.5,
-                    min_tracking_confidence=0.5,
-                    static_image_mode=True,  # Process each frame independently
+                self._detectors[session_id] = RTMPoseDetector(
+                    device="cuda:0",
+                    det_score_thr=0.3,
+                    pose_score_thr=0.3,
+                    max_persons=5,
                 )
                 self._frame_counts[session_id] = 0
             return self._detectors[session_id]
@@ -386,15 +390,20 @@ class FrameProcessor:
 
             # Get detector for this session
             detector = await self.get_detector(session_id)
-            print(f"[MediaPipe] Detector initialized: {detector.is_initialized}")
+            print(f"[RTMPose] Detector initialized: {detector.is_initialized}")
 
             # Increment frame count
             async with self._lock:
                 self._frame_counts[session_id] += 1
                 frame_number = self._frame_counts[session_id]
 
-            # Detect pose
-            result = detector.detect(frame)
+            # Detect pose using ThreadPoolExecutor (non-blocking)
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                self._executor,
+                detector.detect,
+                frame
+            )
             print(f"[Pose] Frame #{frame_number}: detected={result.detected}, confidence={result.confidence:.3f}")
 
             # Convert result to API format
@@ -452,6 +461,8 @@ class FrameProcessor:
                 detector.release()
             self._detectors.clear()
             self._frame_counts.clear()
+        # Shutdown thread pool
+        self._executor.shutdown(wait=False)
 
 
 # Global frame processor

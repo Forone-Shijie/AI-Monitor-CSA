@@ -110,7 +110,7 @@
 | 模块 | 技术 |
 |------|------|
 | 后端框架 | Python 3.10+, FastAPI |
-| 姿态检测 | MediaPipe Pose (33关键点) |
+| 姿态检测 | RTMPose-M (MMPose, COCO 17关键点, GPU加速) |
 | 动作识别 | ST-GCN + LSTM |
 | 语音识别 | 豆包 ASR API / Whisper (双模式) |
 | 数据库 | PostgreSQL + Redis |
@@ -148,7 +148,8 @@
 - Node.js >= 18
 - PostgreSQL >= 14
 - Redis >= 6
-- CUDA >= 11.8 (可选，用于GPU加速)
+- **NVIDIA GPU** (必需，RTMPose 姿态检测)
+- CUDA >= 12.0 (推荐 12.4)
 
 ### 安装
 
@@ -264,8 +265,11 @@ asr:
   language: zh
 
 pose:
-  model: mediapipe
-  confidence_threshold: 0.5
+  engine: rtmpose
+  device: "cuda:0"
+  det_score_thr: 0.3
+  pose_score_thr: 0.3
+  max_persons: 5
 
 evaluation:
   pose_weight: 0.3
