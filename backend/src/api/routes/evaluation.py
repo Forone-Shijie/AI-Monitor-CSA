@@ -16,10 +16,13 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
 from ..schemas import (
+    BracePositionTimeline,
+    BraceStepStatus,
     DimensionScoreData,
     ErrorResponse,
     EvaluationData,
     EvaluationResponse,
+    HoldDuration,
     ReportData,
     ReportListResponse,
     ReportResponse,
@@ -270,6 +273,21 @@ async def get_demo_report(report_type: str) -> ReportResponse:
     trainee_info = report.get("trainee", {})
     scores = report.get("scores", {})
 
+    # Parse timeline if present
+    timeline_data = report.get("timeline")
+    timeline = None
+    if timeline_data:
+        timeline = BracePositionTimeline(
+            direction=timeline_data.get("direction", ""),
+            direction_name=timeline_data.get("direction_name", ""),
+            trigger_time=timeline_data.get("trigger_time", 0),
+            steps=[BraceStepStatus(**s) for s in timeline_data.get("steps", [])],
+            hold_duration=HoldDuration(**timeline_data.get("hold_duration", {"required": 30, "actual": 0})),
+            total_time=timeline_data.get("total_time", 0),
+            overall_compliant=timeline_data.get("overall_compliant", False),
+            issues_summary=timeline_data.get("issues_summary"),
+        )
+
     data = ReportData(
         report_id=report.get("report_id", ""),
         generated_at=report.get("generated_at", ""),
@@ -292,6 +310,7 @@ async def get_demo_report(report_type: str) -> ReportResponse:
         ai_notice=report.get("ai_notice", ""),
         strengths=report.get("strengths", []),
         improvements=report.get("improvements", []),
+        timeline=timeline,
     )
 
     return ReportResponse(

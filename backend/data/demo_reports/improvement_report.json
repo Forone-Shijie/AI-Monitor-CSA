@@ -97,5 +97,30 @@
     "使用完整口令：不漏掉「跳」的指令",
     "添加英文口令播报",
     "控制语速在150字/分钟左右"
-  ]
+  ],
+  "timeline": {
+    "direction": "rear_facing",
+    "direction_name": "面向机尾方向",
+    "trigger_time": 0,
+    "steps": [
+      {"step_id": 1, "step_name": "背部紧靠座椅靠背", "standard_time": 0.8, "actual_time": 1.5, "is_compliant": false, "deviation": "响应延迟0.7秒"},
+      {"step_id": 2, "step_name": "系紧安全带和肩带", "standard_time": 1.5, "actual_time": 2.8, "is_compliant": false, "deviation": "超时1.3秒"},
+      {"step_id": 3, "step_name": "头部紧靠头枕", "standard_time": 2.5, "actual_time": 4.0, "is_compliant": false, "deviation": "头部位置偏高"},
+      {"step_id": 4, "step_name": "胸前交叉手臂", "standard_time": 3.2, "actual_time": 5.5, "is_compliant": false, "deviation": "误握肩带"},
+      {"step_id": 5, "step_name": "脚和腿稍微分开", "standard_time": 4.0, "actual_time": 6.2, "is_compliant": false, "deviation": "超时2.2秒"},
+      {"step_id": 6, "step_name": "脚平放地板", "standard_time": 4.5, "actual_time": 7.0, "is_compliant": false, "deviation": "超时2.5秒"},
+      {"step_id": 7, "step_name": "膝盖弯曲90度", "standard_time": 5.0, "actual_time": 8.0, "is_compliant": false, "deviation": "弯曲角度约70度，超时3秒"}
+    ],
+    "hold_duration": {
+      "required": 30,
+      "actual": 24
+    },
+    "total_time": 32,
+    "overall_compliant": false,
+    "issues_summary": [
+      "姿势完成时间8秒，超过标准5秒",
+      "保持时间24秒，未达到30秒要求",
+      "头部位置、手臂姿势、膝盖角度存在偏差"
+    ]
+  }
 }

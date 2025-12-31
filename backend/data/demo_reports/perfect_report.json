@@ -33,5 +33,24 @@
     "撤离口令规范：中英双语播报，与机型匹配正确",
     "姿态保持稳定：全程无明显晃动或姿势走形"
   ],
-  "improvements": []
+  "improvements": [],
+  "timeline": {
+    "direction": "front_facing",
+    "direction_name": "面向机头方向",
+    "trigger_time": 0,
+    "steps": [
+      {"step_id": 1, "step_name": "背部紧靠座椅靠背", "standard_time": 0.8, "actual_time": 0.7, "is_compliant": true},
+      {"step_id": 2, "step_name": "系紧安全带和肩带", "standard_time": 1.5, "actual_time": 1.4, "is_compliant": true},
+      {"step_id": 3, "step_name": "下颚置于胸部", "standard_time": 2.5, "actual_time": 2.3, "is_compliant": true},
+      {"step_id": 4, "step_name": "手放大腿上", "standard_time": 3.2, "actual_time": 3.0, "is_compliant": true},
+      {"step_id": 5, "step_name": "脚和腿稍微分开", "standard_time": 4.0, "actual_time": 3.8, "is_compliant": true},
+      {"step_id": 6, "step_name": "腿部伸展脚平放", "standard_time": 5.0, "actual_time": 4.5, "is_compliant": true}
+    ],
+    "hold_duration": {
+      "required": 30,
+      "actual": 32
+    },
+    "total_time": 36.5,
+    "overall_compliant": true
+  }
 }

@@ -221,7 +221,7 @@ onMounted(async () => {
             </div>
             <SkeletonOverlay
               v-if="currentFrame?.pose"
-              :pose-data="currentFrame.pose"
+              :poses="currentFrame.pose ? [currentFrame.pose] : null"
               :width="640"
               :height="360"
               :show-angles="true"

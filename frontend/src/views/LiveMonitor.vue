@@ -57,9 +57,23 @@ streamingClient.onDisconnect(() => { isStreamConnected.value = false })
 audioStreamingClient.onConnect(() => { isAudioConnected.value = true })
 audioStreamingClient.onDisconnect(() => { isAudioConnected.value = false })
 
-const currentPose = computed<PoseData | null>(() =>
-  sessionStore.currentFrame?.pose || null
-)
+// Multi-person support: return poses array
+const currentPoses = computed<PoseData[]>(() => {
+  const frame = sessionStore.currentFrame
+  if (!frame) return []
+
+  // Prefer multi-person data if available
+  if (frame.poses?.poses) {
+    return frame.poses.poses
+  }
+
+  // Fallback to single pose for backward compatibility
+  if (frame.pose?.detected) {
+    return [frame.pose]
+  }
+
+  return []
+})
 
 const actions = computed<ActionData[]>(() => {
   const actionList: ActionData[] = []
@@ -605,15 +619,16 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- Skeleton Overlay -->
+            <!-- Skeleton Overlay (Multi-person support) -->
             <SkeletonOverlay
-              v-if="currentPose"
-              :pose-data="currentPose"
+              v-if="currentPoses.length > 0"
+              :poses="currentPoses"
               :width="actualVideoRect.width"
               :height="actualVideoRect.height"
               :offset-x="actualVideoRect.x"
               :offset-y="actualVideoRect.y"
               :show-angles="true"
+              :max-persons="3"
             />
 
             <!-- Debug Info Overlay -->
@@ -624,14 +639,11 @@ onUnmounted(() => {
               <div class="debug-item" v-if="sessionStore.currentFrame">
                 帧#: {{ sessionStore.currentFrame.frame_number }}
               </div>
-              <div class="debug-item" v-if="sessionStore.currentFrame?.pose">
-                检测: {{ sessionStore.currentFrame.pose.detected ? '✓' : '✗' }}
+              <div class="debug-item">
+                人数: {{ currentPoses.length }}
               </div>
-              <div class="debug-item" v-if="sessionStore.currentFrame?.pose">
-                置信度: {{ (sessionStore.currentFrame.pose.confidence * 100).toFixed(1) }}%
-              </div>
-              <div class="debug-item" v-if="sessionStore.currentFrame?.pose?.keypoints">
-                关键点: {{ sessionStore.currentFrame.pose.keypoints.length }}
+              <div class="debug-item" v-if="currentPoses.length > 0 && currentPoses[0]">
+                置信度: {{ (currentPoses[0].confidence * 100).toFixed(1) }}%
               </div>
             </div>
           </div>

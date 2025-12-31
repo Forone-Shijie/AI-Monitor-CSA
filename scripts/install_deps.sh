@@ -142,61 +142,89 @@ echo -e "${YELLOW}[5/9] 安装 mmcv (带 CUDA 扩展)...${NC}"
 # 安装 mmengine 和 openmim
 pip install openmim==0.3.9 mmengine==0.10.2
 
-# 获取 PyTorch 和 CUDA 版本用于构建下载 URL
+# 获取 PyTorch 和 CUDA 版本
 TORCH_VERSION=$(python -c "import torch; print(torch.__version__.split('+')[0])")
 CUDA_VERSION=$(python -c "import torch; print(torch.version.cuda.replace('.', '')[:3] if torch.version.cuda else 'cpu')")
 echo -e "  ${CYAN}PyTorch ${TORCH_VERSION}, CUDA ${CUDA_VERSION}${NC}"
 
-# mmcv 预编译包 URL
-MMCV_URL="https://download.openmmlab.com/mmcv/dist/cu${CUDA_VERSION}/torch${TORCH_VERSION}/index.html"
-
-# 方法1: 尝试从 OpenMMLab 下载预编译版本
-echo -e "  ${CYAN}尝试下载预编译 mmcv...${NC}"
 MMCV_INSTALLED=false
 
-for attempt in 1 2 3; do
-    if pip install mmcv==2.1.0 -f "$MMCV_URL" --timeout 300 2>&1 | tee /tmp/mmcv_install.log; then
-        # 检查是否真正安装了带 ops 的版本
-        if python -c "from mmcv.ops import MultiScaleDeformableAttention" 2>/dev/null; then
-            MMCV_INSTALLED=true
-            echo -e "${GREEN}  ✓ mmcv 预编译版本 (带 CUDA ops) 安装成功${NC}"
-            break
-        else
-            echo -e "${YELLOW}  预编译版本缺少 CUDA ops，尝试重新安装...${NC}"
-            pip uninstall -y mmcv 2>/dev/null || true
-        fi
+# 方法1: 使用 mim 安装 (推荐，自动匹配 PyTorch/CUDA 版本)
+echo -e "  ${CYAN}使用 mim 安装预编译 mmcv...${NC}"
+if mim install mmcv==2.1.0 2>&1 | tee /tmp/mmcv_install.log; then
+    # 检查是否安装了完整版本 (带 _ext 模块)
+    if python -c "import mmcv._ext; from mmcv.ops import MultiScaleDeformableAttention" 2>/dev/null; then
+        MMCV_INSTALLED=true
+        echo -e "${GREEN}  ✓ mmcv 预编译版本 (带 CUDA ops) 安装成功${NC}"
     else
-        echo -e "${YELLOW}  下载失败 (尝试 $attempt/3)${NC}"
-        sleep 3
-    fi
-done
-
-# 方法2: 从源码编译
-if [ "$MMCV_INSTALLED" = false ]; then
-    echo -e "${YELLOW}  预编译版本不可用，从源码编译 mmcv...${NC}"
-    echo -e "${YELLOW}  (这可能需要 10-30 分钟，请耐心等待)${NC}"
-
-    # 安装编译依赖
-    pip install ninja
-
-    # 确保环境变量正确
-    export MMCV_WITH_OPS=1
-    export FORCE_CUDA=1
-
-    # 从 PyPI 源码编译
-    if pip install mmcv==2.1.0 --no-binary mmcv -v 2>&1 | tee /tmp/mmcv_build.log; then
-        if python -c "from mmcv.ops import MultiScaleDeformableAttention" 2>/dev/null; then
-            MMCV_INSTALLED=true
-            echo -e "${GREEN}  ✓ mmcv 源码编译成功 (带 CUDA ops)${NC}"
-        fi
+        echo -e "${YELLOW}  mim 安装的版本缺少 CUDA ops，尝试其他方法...${NC}"
+        pip uninstall -y mmcv 2>/dev/null || true
     fi
 fi
 
-# 方法3: 最后手段 - 安装不带 CUDA ops 的版本
+# 方法2: 直接从 OpenMMLab 下载预编译 wheel
 if [ "$MMCV_INSTALLED" = false ]; then
-    echo -e "${YELLOW}  ⚠ CUDA ops 编译失败，安装基础版本...${NC}"
+    echo -e "  ${CYAN}从 OpenMMLab 下载预编译 wheel...${NC}"
+    MMCV_URL="https://download.openmmlab.com/mmcv/dist/cu${CUDA_VERSION}/torch${TORCH_VERSION}/index.html"
+
+    for attempt in 1 2 3; do
+        if pip install mmcv==2.1.0 -f "$MMCV_URL" --timeout 300 2>&1 | tee /tmp/mmcv_install.log; then
+            if python -c "import mmcv._ext; from mmcv.ops import MultiScaleDeformableAttention" 2>/dev/null; then
+                MMCV_INSTALLED=true
+                echo -e "${GREEN}  ✓ mmcv 预编译版本 (带 CUDA ops) 安装成功${NC}"
+                break
+            else
+                echo -e "${YELLOW}  预编译版本缺少 CUDA ops，重试...${NC}"
+                pip uninstall -y mmcv 2>/dev/null || true
+            fi
+        else
+            echo -e "${YELLOW}  下载失败 (尝试 $attempt/3)${NC}"
+            sleep 3
+        fi
+    done
+fi
+
+# 方法3: 从源码编译 (需要 nvcc)
+if [ "$MMCV_INSTALLED" = false ]; then
+    if command -v nvcc &> /dev/null; then
+        echo -e "${YELLOW}  预编译版本不可用，从源码编译 mmcv...${NC}"
+        echo -e "${YELLOW}  (这可能需要 10-30 分钟，请耐心等待)${NC}"
+
+        # 安装编译依赖
+        pip install ninja
+
+        # 设置编译环境变量
+        export MMCV_WITH_OPS=1
+        export FORCE_CUDA=1
+
+        # 确保 CUDA 路径正确
+        if [ -n "$CUDA_HOME" ]; then
+            export PATH="$CUDA_HOME/bin:$PATH"
+        fi
+
+        # 从 PyPI 源码编译
+        if pip install mmcv==2.1.0 --no-binary mmcv -v 2>&1 | tee /tmp/mmcv_build.log; then
+            if python -c "import mmcv._ext; from mmcv.ops import MultiScaleDeformableAttention" 2>/dev/null; then
+                MMCV_INSTALLED=true
+                echo -e "${GREEN}  ✓ mmcv 源码编译成功 (带 CUDA ops)${NC}"
+            fi
+        fi
+    else
+        echo -e "${YELLOW}  nvcc 未找到，跳过源码编译${NC}"
+    fi
+fi
+
+# 方法4: 最后手段 - 安装基础版本并给出详细错误信息
+if [ "$MMCV_INSTALLED" = false ]; then
+    echo -e "${RED}  ✗ 无法安装带 CUDA ops 的 mmcv${NC}"
+    echo -e "${RED}    可能原因:${NC}"
+    echo -e "${RED}    1. 网络无法访问 download.openmmlab.com${NC}"
+    echo -e "${RED}    2. 没有匹配 PyTorch ${TORCH_VERSION} + CUDA ${CUDA_VERSION} 的预编译包${NC}"
+    echo -e "${RED}    3. 缺少 nvcc 编译器无法从源码编译${NC}"
+    echo ""
+    echo -e "${YELLOW}  安装基础版本 (MMPose 将使用 CPU 推理)...${NC}"
     pip install mmcv==2.1.0
-    echo -e "${YELLOW}  ⚠ mmcv 已安装但不含 CUDA 扩展，RTMPose 可能较慢${NC}"
+    echo -e "${YELLOW}  ⚠ 警告: mmcv 缺少 CUDA 扩展，RTMPose 推理速度会较慢${NC}"
 fi
 echo ""
 

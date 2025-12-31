@@ -306,6 +306,37 @@ class SuggestionData(BaseModel):
     example: Optional[str] = None
 
 
+class BraceStepStatus(BaseModel):
+    """Status of a single brace position step."""
+
+    step_id: int
+    step_name: str
+    standard_time: float
+    actual_time: Optional[float] = None
+    is_compliant: bool = False
+    deviation: Optional[str] = None
+
+
+class HoldDuration(BaseModel):
+    """Hold duration data."""
+
+    required: float
+    actual: float
+
+
+class BracePositionTimeline(BaseModel):
+    """Timeline for brace position training."""
+
+    direction: str  # 'front_facing' or 'rear_facing'
+    direction_name: str
+    trigger_time: float = 0
+    steps: List[BraceStepStatus] = []
+    hold_duration: HoldDuration
+    total_time: float
+    overall_compliant: bool = False
+    issues_summary: Optional[List[str]] = None
+
+
 class ReportData(BaseModel):
     """Training report data."""
 
@@ -330,6 +361,7 @@ class ReportData(BaseModel):
     ai_notice: str = ""
     strengths: List[str] = []
     improvements: List[str] = []
+    timeline: Optional[BracePositionTimeline] = None
 
 
 class ReportResponse(BaseResponse):

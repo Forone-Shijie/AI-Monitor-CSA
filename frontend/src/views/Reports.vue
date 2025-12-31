@@ -3,7 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useReportStore } from '@/stores/report'
 import RadarChart from '@/components/charts/RadarChart.vue'
 import ScorePanel from '@/components/monitoring/ScorePanel.vue'
-import type { ReportData, Suggestion, ScoreBreakdown } from '@/types/api'
+import SOPTimeline from '@/components/charts/SOPTimeline.vue'
+import type { ReportData, Suggestion, ScoreBreakdown, BracePositionTimeline } from '@/types/api'
 
 const reportStore = useReportStore()
 
@@ -64,6 +65,10 @@ const highPrioritySuggestions = computed(() =>
 
 const otherSuggestions = computed(() =>
   suggestions.value.filter(s => s.priority !== 1)
+)
+
+const timeline = computed<BracePositionTimeline | null>(() =>
+  currentReport.value?.timeline || null
 )
 
 async function loadReports() {
@@ -261,6 +266,14 @@ onMounted(loadReports)
               </div>
               <ScorePanel :scores="currentScores" />
             </div>
+          </div>
+
+          <!-- SOP Timeline -->
+          <div v-if="timeline" class="hud-panel timeline-panel">
+            <div class="hud-panel-header">
+              <span class="hud-panel-title">SOP 时间轴分析</span>
+            </div>
+            <SOPTimeline :timeline="timeline" />
           </div>
 
           <!-- Suggestions -->

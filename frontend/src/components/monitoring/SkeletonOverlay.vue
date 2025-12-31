@@ -3,21 +3,45 @@ import { ref, computed, watch, onMounted } from 'vue'
 import type { PoseData } from '@/types/api'
 
 const props = withDefaults(defineProps<{
-  poseData: PoseData | null
+  poses: PoseData[] | null  // Multi-person support
   width?: number
   height?: number
   offsetX?: number
   offsetY?: number
   showAngles?: boolean
+  maxPersons?: number
 }>(), {
   width: 640,
   height: 480,
   offsetX: 0,
   offsetY: 0,
-  showAngles: false
+  showAngles: false,
+  maxPersons: 3
 })
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+
+// Color palette for different persons (up to 3)
+const PERSON_COLORS = [
+  {
+    // Person 1: Cyan (primary, matching HUD theme)
+    skeleton: 'rgba(0, 212, 255, 0.6)',
+    joints: '#00d4ff',
+    glow: '#00d4ff40'
+  },
+  {
+    // Person 2: Magenta/Pink
+    skeleton: 'rgba(255, 0, 212, 0.6)',
+    joints: '#ff00d4',
+    glow: '#ff00d440'
+  },
+  {
+    // Person 3: Lime/Green
+    skeleton: 'rgba(0, 255, 136, 0.6)',
+    joints: '#00ff88',
+    glow: '#00ff8840'
+  }
+]
 
 // COCO 17-point Pose connections (RTMPose output format)
 // Keypoint indices:
@@ -44,31 +68,6 @@ const connections = [
   [12, 14], [14, 16],   // Hip to knee to ankle
 ]
 
-const keypointColors: Record<number, string> = {
-  // Face - cyan
-  0: '#00d4ff',   // Nose
-  1: '#00d4ff',   // Left Eye
-  2: '#00d4ff',   // Right Eye
-  3: '#00d4ff',   // Left Ear
-  4: '#00d4ff',   // Right Ear
-  // Shoulders - green
-  5: '#00ff88',   // Left Shoulder
-  6: '#00ff88',   // Right Shoulder
-  // Arms - yellow
-  7: '#ffcc00',   // Left Elbow
-  8: '#ffcc00',   // Right Elbow
-  9: '#ffcc00',   // Left Wrist
-  10: '#ffcc00',  // Right Wrist
-  // Hips - green
-  11: '#00ff88',  // Left Hip
-  12: '#00ff88',  // Right Hip
-  // Legs - orange
-  13: '#ff9944',  // Left Knee
-  14: '#ff9944',  // Right Knee
-  15: '#ff9944',  // Left Ankle
-  16: '#ff9944',  // Right Ankle
-}
-
 // Helper to safely get keypoint coordinates
 function getKeypointXY(kp: number[] | undefined): { x: number; y: number } | null {
   if (!kp || kp.length < 2) return null
@@ -86,69 +85,85 @@ function isKeypointVisible(kp: number[] | undefined, threshold = 0.5): boolean {
   return visibility !== undefined && visibility > threshold
 }
 
+// Get angle labels for all persons
 const angleLabels = computed(() => {
-  if (!props.poseData?.angles) return []
-  const angles = props.poseData.angles
-  const keypoints = props.poseData.keypoints || []
-  const result: Array<{ x: number; y: number; value: number }> = []
+  const allLabels: Array<{ x: number; y: number; value: number; personIdx: number }>[] = []
 
-  // Left elbow angle (COCO index 7)
-  const leftElbow = getKeypointXY(keypoints[7])
-  if (angles.left_elbow !== undefined && leftElbow) {
-    result.push({
-      x: leftElbow.x * props.width,
-      y: leftElbow.y * props.height,
-      value: Math.round(angles.left_elbow)
-    })
+  const poses = props.poses?.slice(0, props.maxPersons) || []
+
+  for (let personIdx = 0; personIdx < poses.length; personIdx++) {
+    const pose = poses[personIdx]
+    if (!pose?.angles || !pose.keypoints) continue
+
+    const angles = pose.angles
+    const keypoints = pose.keypoints
+    const result: Array<{ x: number; y: number; value: number; personIdx: number }> = []
+
+    // Left elbow angle (COCO index 7)
+    const leftElbow = getKeypointXY(keypoints[7])
+    if (angles.left_elbow !== undefined && leftElbow) {
+      result.push({
+        x: leftElbow.x * props.width,
+        y: leftElbow.y * props.height,
+        value: Math.round(angles.left_elbow),
+        personIdx
+      })
+    }
+
+    // Right elbow angle (COCO index 8)
+    const rightElbow = getKeypointXY(keypoints[8])
+    if (angles.right_elbow !== undefined && rightElbow) {
+      result.push({
+        x: rightElbow.x * props.width,
+        y: rightElbow.y * props.height,
+        value: Math.round(angles.right_elbow),
+        personIdx
+      })
+    }
+
+    // Left knee angle (COCO index 13)
+    const leftKnee = getKeypointXY(keypoints[13])
+    if (angles.left_knee !== undefined && leftKnee) {
+      result.push({
+        x: leftKnee.x * props.width,
+        y: leftKnee.y * props.height,
+        value: Math.round(angles.left_knee),
+        personIdx
+      })
+    }
+
+    // Right knee angle (COCO index 14)
+    const rightKnee = getKeypointXY(keypoints[14])
+    if (angles.right_knee !== undefined && rightKnee) {
+      result.push({
+        x: rightKnee.x * props.width,
+        y: rightKnee.y * props.height,
+        value: Math.round(angles.right_knee),
+        personIdx
+      })
+    }
+
+    allLabels.push(result)
   }
 
-  // Right elbow angle (COCO index 8)
-  const rightElbow = getKeypointXY(keypoints[8])
-  if (angles.right_elbow !== undefined && rightElbow) {
-    result.push({
-      x: rightElbow.x * props.width,
-      y: rightElbow.y * props.height,
-      value: Math.round(angles.right_elbow)
-    })
-  }
-
-  // Left knee angle (COCO index 13)
-  const leftKnee = getKeypointXY(keypoints[13])
-  if (angles.left_knee !== undefined && leftKnee) {
-    result.push({
-      x: leftKnee.x * props.width,
-      y: leftKnee.y * props.height,
-      value: Math.round(angles.left_knee)
-    })
-  }
-
-  // Right knee angle (COCO index 14)
-  const rightKnee = getKeypointXY(keypoints[14])
-  if (angles.right_knee !== undefined && rightKnee) {
-    result.push({
-      x: rightKnee.x * props.width,
-      y: rightKnee.y * props.height,
-      value: Math.round(angles.right_knee)
-    })
-  }
-
-  return result
+  return allLabels.flat()
 })
 
-function drawSkeleton() {
-  const canvas = canvasRef.value
-  if (!canvas || !props.poseData?.keypoints) return
+// Default color (fallback)
+const DEFAULT_COLOR = PERSON_COLORS[0]!
 
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
+function drawSinglePerson(
+  ctx: CanvasRenderingContext2D,
+  pose: PoseData,
+  personIdx: number
+) {
+  if (!pose.keypoints) return
 
-  // Clear canvas
-  ctx.clearRect(0, 0, props.width, props.height)
-
-  const keypoints = props.poseData.keypoints
+  const keypoints = pose.keypoints
+  const colors = PERSON_COLORS[personIdx] ?? DEFAULT_COLOR
 
   // Draw connections
-  ctx.strokeStyle = 'rgba(0, 212, 255, 0.6)'
+  ctx.strokeStyle = colors.skeleton
   ctx.lineWidth = 2
 
   for (const conn of connections) {
@@ -176,45 +191,74 @@ function drawSkeleton() {
     if (xy && isKeypointVisible(kp)) {
       const x = xy.x * props.width
       const y = xy.y * props.height
-      const color = keypointColors[i as keyof typeof keypointColors] || '#00d4ff'
 
       // Outer glow
       ctx.beginPath()
       ctx.arc(x, y, 6, 0, Math.PI * 2)
-      ctx.fillStyle = color + '40'
+      ctx.fillStyle = colors.glow
       ctx.fill()
 
       // Inner dot
       ctx.beginPath()
       ctx.arc(x, y, 3, 0, Math.PI * 2)
-      ctx.fillStyle = color
+      ctx.fillStyle = colors.joints
       ctx.fill()
     }
   }
+}
 
-  // Draw angle labels
-  if (props.showAngles) {
+function drawSkeleton() {
+  const canvas = canvasRef.value
+  if (!canvas) return
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  // Clear canvas
+  ctx.clearRect(0, 0, props.width, props.height)
+
+  const poses = props.poses?.slice(0, props.maxPersons) || []
+
+  // Draw each person with different colors
+  for (let personIdx = 0; personIdx < poses.length; personIdx++) {
+    const pose = poses[personIdx]
+    if (pose?.detected && pose.keypoints) {
+      drawSinglePerson(ctx, pose, personIdx)
+    }
+  }
+
+  // Draw angle labels for all persons
+  if (props.showAngles && angleLabels.value.length > 0) {
     ctx.font = '12px monospace'
     ctx.textAlign = 'center'
 
     for (const angle of angleLabels.value) {
+      const colors = PERSON_COLORS[angle.personIdx] ?? DEFAULT_COLOR
+
       // Background
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
       ctx.fillRect(angle.x - 18, angle.y - 24, 36, 18)
 
-      // Text
-      ctx.fillStyle = '#ffcc00'
+      // Text with person's color
+      ctx.fillStyle = colors.joints
       ctx.fillText(`${angle.value}°`, angle.x, angle.y - 10)
     }
   }
 }
 
-// Watch only timestamp to avoid expensive deep comparison
+// Watch for changes - use timestamp of first pose or length change
 watch(
-  () => props.poseData?.timestamp,
   () => {
-    if (props.poseData) drawSkeleton()
-  }
+    const poses = props.poses || []
+    return {
+      length: poses.length,
+      timestamp: poses[0]?.timestamp
+    }
+  },
+  () => {
+    drawSkeleton()
+  },
+  { deep: false }
 )
 
 onMounted(() => {

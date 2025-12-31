@@ -103,6 +103,14 @@ export interface PoseData {
   angles?: Record<string, number>
   pose_type?: string
   confidence: number
+  person_id?: number  // Multi-person support: person identifier (0, 1, 2...)
+}
+
+// Multi-person pose result
+export interface MultiPersonPoseData {
+  timestamp: number
+  num_persons: number
+  poses: PoseData[]
 }
 
 export interface ActionData {
@@ -140,7 +148,8 @@ export interface BodyPartStatus {
 export interface MonitoringFrame {
   frame_number: number
   timestamp: number
-  pose?: PoseData
+  pose?: PoseData           // Single person (legacy/backward compat)
+  poses?: MultiPersonPoseData  // Multi-person support
   action?: ActionData
   asr?: ASRData
   brace?: BraceData
@@ -241,6 +250,33 @@ export interface CommunicationAnalysisDetail {
 }
 
 // =============================================================================
+// SOP Timeline Types (Brace Position)
+// =============================================================================
+
+export interface BraceStepStatus {
+  step_id: number               // 1-7
+  step_name: string             // Action name
+  standard_time: number         // Standard completion time (cumulative seconds)
+  actual_time: number | null    // Actual completion time, null = not completed
+  is_compliant: boolean         // Whether compliant with standard
+  deviation?: string            // Deviation description
+}
+
+export interface BracePositionTimeline {
+  direction: 'front_facing' | 'rear_facing'  // Facing head or tail
+  direction_name: string                      // Display name (面向机头方向/面向机尾方向)
+  trigger_time: number                        // Trigger time (0)
+  steps: BraceStepStatus[]                    // Step statuses
+  hold_duration: {
+    required: number            // 30 seconds
+    actual: number              // Actual hold duration
+  }
+  total_time: number            // Total duration
+  overall_compliant: boolean    // Overall compliance
+  issues_summary?: string[]     // Summary of issues (for improvement report)
+}
+
+// =============================================================================
 // Report Types
 // =============================================================================
 
@@ -266,6 +302,7 @@ export interface ReportData {
   ai_notice: string
   strengths: string[]
   improvements: string[]
+  timeline?: BracePositionTimeline  // SOP timeline for brace position
 }
 
 export interface Suggestion {

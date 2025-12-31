@@ -373,14 +373,14 @@ class FrameProcessor:
         frame_data: bytes,
     ) -> Optional[Dict[str, Any]]:
         """
-        Process a video frame and return pose detection results.
+        Process a video frame and return multi-person pose detection results.
 
         Args:
             session_id: Session identifier
             frame_data: JPEG image bytes from browser
 
         Returns:
-            Detection results as dict, or None if processing failed
+            Detection results as dict with multi-person poses, or None if processing failed
         """
         try:
             # Decode JPEG to numpy array
@@ -397,38 +397,55 @@ class FrameProcessor:
                 self._frame_counts[session_id] += 1
                 frame_number = self._frame_counts[session_id]
 
-            # Detect pose using ThreadPoolExecutor (non-blocking)
+            # Detect multiple persons using ThreadPoolExecutor (non-blocking)
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
+            multi_result = await loop.run_in_executor(
                 self._executor,
-                detector.detect,
+                detector.detect_multi,
                 frame
             )
-            print(f"[Pose] Frame #{frame_number}: detected={result.detected}, confidence={result.confidence:.3f}")
+            print(f"[Pose] Frame #{frame_number}: detected {multi_result.num_persons} person(s)")
 
-            # Convert result to API format
-            pose_data: Optional[Dict[str, Any]] = None
-            if result.detected:
-                # Convert landmarks to list format
-                keypoints = [
-                    [lm.x, lm.y, lm.z, lm.visibility]
-                    for lm in result.landmarks
-                ] if result.landmarks else None
-                print(f"[Pose] Landmarks: {len(result.landmarks) if result.landmarks else 0}, pose_type={result.pose_type.value}")
+            # Convert multi-person results to API format
+            poses_list: List[Dict[str, Any]] = []
+            max_persons = 3  # Limit to 3 persons for frontend display
 
-                # Convert angles to dict
-                angles = result.angles.to_dict() if result.angles else None
+            for i, result in enumerate(multi_result.poses[:max_persons]):
+                if result.detected:
+                    # Convert landmarks to list format
+                    keypoints = [
+                        [lm.x, lm.y, lm.z, lm.visibility]
+                        for lm in result.landmarks
+                    ] if result.landmarks else None
 
-                pose_data = {
-                    "timestamp": result.timestamp,
-                    "detected": True,
-                    "keypoints": keypoints,
-                    "angles": angles,
-                    "pose_type": result.pose_type.value,
-                    "confidence": result.confidence,
-                }
+                    # Convert angles to dict
+                    angles = result.angles.to_dict() if result.angles else None
+
+                    pose_data = {
+                        "person_id": i,
+                        "timestamp": result.timestamp,
+                        "detected": True,
+                        "keypoints": keypoints,
+                        "angles": angles,
+                        "pose_type": result.pose_type.value,
+                        "confidence": result.confidence,
+                    }
+                    poses_list.append(pose_data)
+                    print(f"[Pose] Person {i}: confidence={result.confidence:.3f}, pose_type={result.pose_type.value}")
+
+            # Multi-person poses data structure
+            poses_data = {
+                "timestamp": time.time(),
+                "num_persons": len(poses_list),
+                "poses": poses_list,
+            }
+
+            # Keep legacy single-person `pose` field for backward compatibility
+            primary_pose: Optional[Dict[str, Any]] = None
+            if poses_list:
+                primary_pose = poses_list[0]
             else:
-                pose_data = {
+                primary_pose = {
                     "timestamp": time.time(),
                     "detected": False,
                     "confidence": 0.0,
@@ -438,7 +455,8 @@ class FrameProcessor:
                 "session_id": session_id,
                 "frame_number": frame_number,
                 "timestamp": time.time(),
-                "pose": pose_data,
+                "poses": poses_data,  # Multi-person data
+                "pose": primary_pose,  # Backward compatible single-person
             }
 
         except Exception as e:
