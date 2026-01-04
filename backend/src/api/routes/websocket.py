@@ -9,6 +9,7 @@ Endpoints:
 import asyncio
 import io
 import json
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Set
@@ -21,6 +22,9 @@ from PIL import Image
 from ..schemas import MonitoringFrame, PoseData, SessionStatus, WSMessage
 from ..session_manager import session_manager
 from ...perception.rtmpose_detector import RTMPoseDetector
+
+# 配置日志
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["WebSocket"])
 
@@ -386,11 +390,11 @@ class FrameProcessor:
             # Decode JPEG to numpy array
             image = Image.open(io.BytesIO(frame_data))
             frame = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-            print(f"[Frame] Session {session_id}: received {len(frame_data)} bytes, decoded to {frame.shape}")
+            logger.debug(f"Session {session_id}: received {len(frame_data)} bytes, decoded to {frame.shape}")
 
             # Get detector for this session
             detector = await self.get_detector(session_id)
-            print(f"[RTMPose] Detector initialized: {detector.is_initialized}")
+            logger.debug(f"RTMPose detector initialized: {detector.is_initialized}")
 
             # Increment frame count
             async with self._lock:
@@ -404,7 +408,7 @@ class FrameProcessor:
                 detector.detect_multi,
                 frame
             )
-            print(f"[Pose] Frame #{frame_number}: detected {multi_result.num_persons} person(s)")
+            logger.debug(f"Frame #{frame_number}: detected {multi_result.num_persons} person(s)")
 
             # Convert multi-person results to API format
             poses_list: List[Dict[str, Any]] = []
@@ -431,7 +435,7 @@ class FrameProcessor:
                         "confidence": result.confidence,
                     }
                     poses_list.append(pose_data)
-                    print(f"[Pose] Person {i}: confidence={result.confidence:.3f}, pose_type={result.pose_type.value}")
+                    logger.debug(f"Person {i}: confidence={result.confidence:.3f}, pose_type={result.pose_type.value}")
 
             # Multi-person poses data structure
             poses_data = {
@@ -460,7 +464,7 @@ class FrameProcessor:
             }
 
         except Exception as e:
-            print(f"Frame processing error: {e}")
+            logger.error(f"Frame processing error: {e}", exc_info=True)
             return None
 
     async def cleanup_session(self, session_id: str) -> None:
@@ -625,9 +629,9 @@ class AudioProcessor:
 
         # 检查配置
         if self._config.validate():
-            print("[ASR] DoubaoASR configured (bigmodel_async mode)")
+            logger.info("DoubaoASR configured (bigmodel_async mode)")
         else:
-            print("[ASR] DoubaoASR config incomplete, check DOUBAO_APP_ID and DOUBAO_ACCESS_TOKEN")
+            logger.warning("DoubaoASR config incomplete, check DOUBAO_APP_ID and DOUBAO_ACCESS_TOKEN")
 
     async def start_session(
         self,
@@ -651,17 +655,17 @@ class AudioProcessor:
                 return True
 
             if not self._config.validate():
-                print(f"[ASR] Cannot create session: config invalid")
+                logger.error("Cannot create ASR session: config invalid")
                 return False
 
             session = DoubaoStreamingSession(self._config, on_result=on_result)
             if await session.start():
                 self._sessions[session_id] = session
                 self._result_callbacks[session_id] = on_result
-                print(f"[ASR] Started streaming session for {session_id}")
+                logger.info(f"Started ASR streaming session for {session_id}")
                 return True
             else:
-                print(f"[ASR] Failed to start streaming session for {session_id}")
+                logger.error(f"Failed to start ASR streaming session for {session_id}")
                 return False
 
     async def send_audio(
@@ -694,7 +698,7 @@ class AudioProcessor:
             await session.send_audio(audio_data, is_last=is_last)
             return True
         except Exception as e:
-            print(f"[ASR] Error sending audio: {e}")
+            logger.error(f"Error sending audio to ASR: {e}", exc_info=True)
             return False
 
     def get_current_text(self, session_id: str) -> str:
@@ -721,7 +725,7 @@ class AudioProcessor:
             final_text = session.get_current_text()
             return {"text": final_text, "is_final": True} if final_text else None
         except Exception as e:
-            print(f"[ASR] Error finalizing session: {e}")
+            logger.error(f"Error finalizing ASR session: {e}", exc_info=True)
             return None
 
     async def cleanup_session(self, session_id: str) -> Optional[str]:
@@ -732,7 +736,7 @@ class AudioProcessor:
 
         if session:
             final_text = await session.stop()
-            print(f"[ASR] Cleaned up session {session_id}")
+            logger.info(f"Cleaned up ASR session {session_id}")
             return final_text
         return None
 

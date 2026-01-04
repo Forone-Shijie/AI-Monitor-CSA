@@ -4,6 +4,7 @@ RTMPose Detector - Multi-person pose detection using MMPose RTMPose.
 Provides GPU-accelerated multi-person pose estimation with COCO 17 keypoints.
 """
 
+import logging
 import time
 from dataclasses import dataclass
 from typing import List, Optional
@@ -21,6 +22,9 @@ from .pose_detector import (
     PoseResult,
     PoseType,
 )
+
+# 配置日志
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -111,10 +115,10 @@ class RTMPoseDetector(PoseDetector):
 
             # Check CUDA availability
             if "cuda" in self._device and not torch.cuda.is_available():
-                print("[RTMPose] CUDA not available, falling back to CPU")
+                logger.warning("CUDA not available, falling back to CPU")
                 self._device = "cpu"
 
-            print(f"[RTMPose] Initializing on {self._device}...")
+            logger.info(f"Initializing RTMPose on {self._device}...")
 
             # Use MMPoseInferencer - high-level API that handles everything
             # Full model names from mmpose model-index.yml
@@ -126,7 +130,7 @@ class RTMPoseDetector(PoseDetector):
             )
 
             self._is_initialized = True
-            print(f"[RTMPose] Initialized successfully on {self._device}")
+            logger.info(f"RTMPose initialized successfully on {self._device}")
 
         except ImportError as e:
             raise ImportError(
@@ -136,7 +140,7 @@ class RTMPoseDetector(PoseDetector):
                 "  mim install mmengine mmcv mmdet mmpose"
             )
         except Exception as e:
-            print(f"[RTMPose] Initialization failed: {e}")
+            logger.error(f"RTMPose initialization failed: {e}")
             self._is_initialized = False
             raise
 
@@ -244,9 +248,7 @@ class RTMPoseDetector(PoseDetector):
             return MultiPersonPoseResult(poses, timestamp, self._frame_count)
 
         except Exception as e:
-            print(f"[RTMPose] Detection error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"RTMPose detection error: {e}", exc_info=True)
             return MultiPersonPoseResult([], timestamp, self._frame_count)
 
     def _calculate_angles(self, landmarks: List[Landmark]) -> JointAngles:
