@@ -122,21 +122,29 @@
 
 ## 开发状态
 
-**当前阶段**: Phase 0 - 项目初始化
+**当前阶段**: Phase 5 - 核心功能已实现
 
 | 阶段 | 目标 | 状态 |
 |------|------|------|
-| Phase 0 | 项目初始化 | 进行中 |
-| Phase 1 | 视频输入层 | 待开始 |
-| Phase 2 | 姿态检测（含防冲击姿势） | 待开始 |
-| Phase 3 | 动作识别 | 待开始 |
-| Phase 4 | 语音识别 | 待开始 |
-| Phase 5 | SOP分析（含场景触发） | 待开始 |
+| Phase 0 | 项目初始化 | 完成 |
+| Phase 1 | 视频输入层 | 完成 |
+| Phase 2 | 姿态检测（RTMPose多人检测） | 完成 |
+| Phase 3 | 动作识别 | 进行中 |
+| Phase 4 | 语音识别（豆包ASR流式） | 完成 |
+| Phase 5 | SOP分析（含场景触发） | 进行中 |
 | Phase 6 | 评估引擎 | 待开始 |
-| Phase 7 | 后端API | 待开始 |
-| Phase 8 | 前端开发 | 待开始 |
-| Phase 9 | 系统集成 | 待开始 |
+| Phase 7 | 后端API | 完成 |
+| Phase 8 | 前端开发 | 完成 |
+| Phase 9 | 系统集成 | 进行中 |
 | Phase 10 | 部署交付 | 待开始 |
+
+### 已实现功能
+
+- **实时监控**: 摄像头输入 + WebSocket实时骨骼叠加显示
+- **视频分析**: 视频上传 + 离线分析 + 骨骼可视化
+- **多人姿态检测**: RTMPose-M 支持同时检测5人
+- **语音识别**: 豆包ASR流式识别 + 实时字幕显示
+- **SOP时间轴**: ECharts时间轴展示动作序列
 
 ---
 
@@ -149,7 +157,17 @@
 - PostgreSQL >= 14
 - Redis >= 6
 - **NVIDIA GPU** (必需，RTMPose 姿态检测)
-- CUDA >= 12.0 (推荐 12.4)
+- CUDA >= 12.0 (推荐 12.4，RTX 50系列需要 12.8)
+
+#### GPU 兼容性说明
+
+| GPU 架构 | 显卡型号 | CUDA 要求 | 特殊处理 |
+|----------|----------|-----------|----------|
+| Ampere | RTX 30系列 | 12.0+ | 无 |
+| Ada Lovelace | RTX 40系列 | 12.0+ | 无 |
+| Blackwell | RTX 50系列 (5070/5080/5090) | **12.8+** | 需要特殊安装 |
+
+> **RTX 50系列用户注意**: Blackwell架构(sm_120)需要PyTorch nightly + 源码编译mmcv，详见下方安装说明。
 
 ### 安装
 
@@ -171,6 +189,44 @@ bash scripts/download_models.sh
 cd ../frontend
 npm install
 ```
+
+### RTX 50系列 (Blackwell架构) 特殊安装
+
+RTX 5070/5080/5090 等 Blackwell 架构显卡需要额外步骤：
+
+```bash
+# 运行 Blackwell 兼容性修复脚本
+bash scripts/fix_cuda_blackwell.sh
+```
+
+**脚本会自动完成以下步骤：**
+
+1. **安装 PyTorch nightly (CUDA 12.8)**
+   ```bash
+   pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+   ```
+
+2. **安装 CUDA toolkit 12.8**
+   ```bash
+   conda install -y -c conda-forge cuda-nvcc=12.8.93 cuda-cudart-dev cuda-libraries-dev ninja
+   ```
+
+3. **安装 MM 系列依赖**
+   ```bash
+   pip install openmim mmengine mmdet
+   pip install mmpose --no-deps
+   pip install xtcocotools munkres json_tricks
+   ```
+
+4. **从源码编译 mmcv (支持 sm_120)**
+   ```bash
+   cd /tmp && git clone --depth 1 -b v2.1.0 https://github.com/open-mmlab/mmcv.git
+   cd mmcv
+   export TORCH_CUDA_ARCH_LIST="8.0;8.6;9.0;12.0"
+   python setup.py develop
+   ```
+
+> **注意**: 源码编译 mmcv 需要 GCC < 14.0，脚本会自动使用系统 GCC。编译过程约需 10-15 分钟。
 
 ### 运行
 
@@ -221,20 +277,24 @@ AI-Monitor-CSA/
 │   │   ├── perception/       # 姿态检测/动作识别/ASR
 │   │   ├── analysis/         # SOP时序分析/防冲击姿势检测
 │   │   ├── evaluation/       # 评估引擎
-│   │   └── api/              # REST API
+│   │   ├── services/         # 业务服务（视频管理等）
+│   │   └── api/              # REST API + WebSocket
+│   │       └── routes/       # API路由（websocket/uploads）
 │   ├── config/               # 配置文件
+│   ├── uploads/              # 上传视频存储目录
 │   └── tests/                # 测试
 │
 ├── frontend/                 # 前端项目 (Vue 3 + TypeScript)
 │   └── src/
-│       ├── views/            # 页面视图
-│       ├── components/       # 组件
+│       ├── views/            # 页面视图（Dashboard/VideoAnalyzer）
+│       ├── components/       # 组件（骨骼叠加/评分面板/上传组件）
 │       ├── stores/           # Pinia 状态管理
+│       ├── services/         # API/WebSocket服务
 │       └── router/           # Vue Router
 │
 ├── models/                   # AI模型文件
 ├── docs/                     # 文档
-├── scripts/                  # 脚本
+├── scripts/                  # 脚本（安装/模型下载/CUDA修复）
 └── docker/                   # Docker配置
 ```
 
@@ -248,6 +308,16 @@ AI-Monitor-CSA/
 | [开发指南](docs/DEVELOPMENT_GUIDE.md) | 开发环境搭建与编码规范 |
 | [执行计划](docs/EXECUTION_PLAN.md) | 项目开发阶段与任务分解 |
 | [技术栈推荐](docs/Technology_Stack_Recommendation.md) | 企业级技术选型规范参考 |
+| [RTX 50系列部署](docs/DEPLOYMENT_BLACKWELL.md) | Blackwell架构GPU部署指南 |
+| [CLAUDE.md](CLAUDE.md) | Claude Code AI辅助开发指南 |
+
+### GPU兼容性脚本
+
+| 脚本 | 说明 |
+|------|------|
+| `scripts/install_deps.sh` | 标准依赖安装（RTX 30/40系列） |
+| `scripts/fix_cuda_blackwell.sh` | RTX 50系列 Blackwell架构修复 |
+| `scripts/download_models.sh` | 下载RTMPose模型权重 |
 
 ---
 

@@ -111,6 +111,15 @@ class RTMPoseDetector(PoseDetector):
         """Initialize MMPose models with automatic download."""
         try:
             import torch
+
+            # 必须先导入 mmdet 和 mmpose.models 以注册模型到 registry
+            # 这解决 'TopdownPoseEstimator is not in the mmdet::model registry' 错误
+            try:
+                import mmdet  # noqa: F401
+            except ImportError:
+                pass  # mmdet is optional for some models
+
+            import mmpose.models  # noqa: F401 - 注册 pose 模型
             from mmpose.apis import MMPoseInferencer
 
             # Check CUDA availability

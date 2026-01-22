@@ -5,7 +5,10 @@ import { useConfigStore } from '@/stores/config'
 import { useSessionStore } from '@/stores/session'
 import { useReportStore } from '@/stores/report'
 import { useMediaStore } from '@/stores/media'
+import { useVideoStore } from '@/stores/video'
 import ScorePanel from '@/components/monitoring/ScorePanel.vue'
+import VideoUpload from '@/components/upload/VideoUpload.vue'
+import VideoLibrary from '@/components/upload/VideoLibrary.vue'
 import type { SessionInfo } from '@/types/api'
 
 const router = useRouter()
@@ -13,16 +16,20 @@ const configStore = useConfigStore()
 const sessionStore = useSessionStore()
 const reportStore = useReportStore()
 const mediaStore = useMediaStore()
+const videoStore = useVideoStore()
 
 const isLoading = ref(true)
 const showNewSession = ref(false)
 const showEditSession = ref(false)
+const uploadError = ref<string | null>(null)
 const newSession = ref({
   trainee_id: '',
   trainee_name: '',
   scenario_id: '',
   camera_id: '' as string,
-  audio_device_id: '' as string
+  audio_device_id: '' as string,
+  video_source: 'camera' as 'camera' | 'file',
+  video_id: '' as string
 })
 const editSession = ref({
   session_id: '',
@@ -120,31 +127,73 @@ async function createNewSession() {
     return
   }
 
+  // Validate video selection for file mode
+  if (newSession.value.video_source === 'file' && !newSession.value.video_id) {
+    uploadError.value = '\u8bf7\u5148\u9009\u62e9\u6216\u4e0a\u4f20\u89c6\u9891\u6587\u4ef6'
+    return
+  }
+
   try {
     // Store selected browser devices in media store for later use in LiveMonitor
-    if (newSession.value.camera_id) {
-      mediaStore.selectCamera(newSession.value.camera_id)
-    }
-    if (newSession.value.audio_device_id) {
-      mediaStore.selectMicrophone(newSession.value.audio_device_id)
+    if (newSession.value.video_source === 'camera') {
+      if (newSession.value.camera_id) {
+        mediaStore.selectCamera(newSession.value.camera_id)
+      }
+      if (newSession.value.audio_device_id) {
+        mediaStore.selectMicrophone(newSession.value.audio_device_id)
+      }
     }
 
-    // Create session - camera_id 0 tells backend to use browser-based video
-    const session = await sessionStore.createSession({
+    // Create session with appropriate video source
+    const sessionData: Parameters<typeof sessionStore.createSession>[0] = {
       trainee_id: newSession.value.trainee_id,
       trainee_name: newSession.value.trainee_name,
       scenario_id: newSession.value.scenario_id || undefined,
-      camera_id: 0, // Use browser-based video
-      audio_device_id: undefined
-    })
+    }
+
+    if (newSession.value.video_source === 'file') {
+      // Use uploaded video file
+      const video = videoStore.videos.find(v => v.video_id === newSession.value.video_id)
+      sessionData.video_source = 'file'
+      sessionData.video_path = video?.file_path
+    } else {
+      // Use browser-based camera
+      sessionData.video_source = 'camera'
+      sessionData.camera_id = 0
+    }
+
+    const session = await sessionStore.createSession(sessionData)
 
     if (session) {
       showNewSession.value = false
-      router.push('/live')
+
+      // Navigate to appropriate page based on video source
+      if (newSession.value.video_source === 'file') {
+        router.push({
+          path: '/video-analyze',
+          query: { videoId: newSession.value.video_id }
+        })
+      } else {
+        router.push('/live')
+      }
     }
   } catch (error) {
     console.error('Failed to create session:', error)
   }
+}
+
+function handleVideoUploaded(videoId: string) {
+  newSession.value.video_id = videoId
+  uploadError.value = null
+}
+
+function handleVideoSelected(videoId: string) {
+  newSession.value.video_id = videoId
+  uploadError.value = null
+}
+
+function handleUploadError(message: string) {
+  uploadError.value = message
 }
 
 function getStatusClass(status: string): string {
@@ -476,44 +525,93 @@ onMounted(loadData)
                 </option>
               </select>
             </div>
+
+            <!-- Video Source Selection -->
             <div class="form-group">
-              <label>摄像头</label>
-              <div v-if="!mediaStore.isPermissionGranted" class="permission-request">
-                <span class="form-hint form-hint--info">需要授权访问摄像头和麦克风</span>
-                <button type="button" class="hud-button hud-button--small" @click="requestMediaPermissions">
-                  请求权限
+              <label>视频来源</label>
+              <div class="source-toggle">
+                <button
+                  type="button"
+                  class="source-btn"
+                  :class="{ active: newSession.video_source === 'camera' }"
+                  @click="newSession.video_source = 'camera'"
+                >
+                  实时摄像头
+                </button>
+                <button
+                  type="button"
+                  class="source-btn"
+                  :class="{ active: newSession.video_source === 'file' }"
+                  @click="newSession.video_source = 'file'"
+                >
+                  上传视频
                 </button>
               </div>
-              <select v-else v-model="newSession.camera_id">
-                <option value="" disabled>{{ mediaStore.cameras.length === 0 ? '未检测到摄像头' : '请选择摄像头' }}</option>
-                <option
-                  v-for="camera in mediaStore.cameras"
-                  :key="camera.deviceId"
-                  :value="camera.deviceId"
-                >
-                  {{ camera.label }}
-                </option>
-              </select>
-              <span v-if="mediaStore.isPermissionGranted && mediaStore.cameras.length === 0" class="form-hint form-hint--warning">
-                未检测到可用摄像头，将使用模拟数据
-              </span>
             </div>
-            <div class="form-group">
-              <label>音频设备</label>
-              <select v-model="newSession.audio_device_id" :disabled="!mediaStore.isPermissionGranted">
-                <option value="" disabled>{{ mediaStore.microphones.length === 0 ? '未检测到音频设备' : '请选择音频设备' }}</option>
-                <option
-                  v-for="mic in mediaStore.microphones"
-                  :key="mic.deviceId"
-                  :value="mic.deviceId"
-                >
-                  {{ mic.label }}
-                </option>
-              </select>
-              <span v-if="mediaStore.isPermissionGranted && mediaStore.microphones.length === 0" class="form-hint form-hint--warning">
-                未检测到可用音频设备
-              </span>
-            </div>
+
+            <!-- Camera Selection (for camera mode) -->
+            <template v-if="newSession.video_source === 'camera'">
+              <div class="form-group">
+                <label>摄像头</label>
+                <div v-if="!mediaStore.isPermissionGranted" class="permission-request">
+                  <span class="form-hint form-hint--info">需要授权访问摄像头和麦克风</span>
+                  <button type="button" class="hud-button hud-button--small" @click="requestMediaPermissions">
+                    请求权限
+                  </button>
+                </div>
+                <select v-else v-model="newSession.camera_id">
+                  <option value="" disabled>{{ mediaStore.cameras.length === 0 ? '未检测到摄像头' : '请选择摄像头' }}</option>
+                  <option
+                    v-for="camera in mediaStore.cameras"
+                    :key="camera.deviceId"
+                    :value="camera.deviceId"
+                  >
+                    {{ camera.label }}
+                  </option>
+                </select>
+                <span v-if="mediaStore.isPermissionGranted && mediaStore.cameras.length === 0" class="form-hint form-hint--warning">
+                  未检测到可用摄像头，将使用模拟数据
+                </span>
+              </div>
+              <div class="form-group">
+                <label>音频设备</label>
+                <select v-model="newSession.audio_device_id" :disabled="!mediaStore.isPermissionGranted">
+                  <option value="" disabled>{{ mediaStore.microphones.length === 0 ? '未检测到音频设备' : '请选择音频设备' }}</option>
+                  <option
+                    v-for="mic in mediaStore.microphones"
+                    :key="mic.deviceId"
+                    :value="mic.deviceId"
+                  >
+                    {{ mic.label }}
+                  </option>
+                </select>
+                <span v-if="mediaStore.isPermissionGranted && mediaStore.microphones.length === 0" class="form-hint form-hint--warning">
+                  未检测到可用音频设备
+                </span>
+              </div>
+            </template>
+
+            <!-- Video Upload (for file mode) -->
+            <template v-else>
+              <div class="form-group">
+                <label>选择视频</label>
+                <VideoLibrary
+                  @select="handleVideoSelected"
+                />
+                <div class="upload-section">
+                  <VideoUpload
+                    @uploaded="handleVideoUploaded"
+                    @error="handleUploadError"
+                  />
+                </div>
+                <span v-if="uploadError" class="form-hint form-hint--warning">
+                  {{ uploadError }}
+                </span>
+                <span v-else-if="newSession.video_id" class="form-hint form-hint--success">
+                  已选择视频
+                </span>
+              </div>
+            </template>
             <div class="form-actions">
               <button type="button" class="hud-button" @click="showNewSession = false">
                 取消
@@ -1062,6 +1160,41 @@ onMounted(loadData)
 
 .form-hint--info {
   color: var(--hud-info);
+}
+
+.form-hint--success {
+  color: var(--hud-success);
+}
+
+.source-toggle {
+  display: flex;
+  gap: var(--hud-spacing-sm);
+}
+
+.source-btn {
+  flex: 1;
+  padding: var(--hud-spacing-sm) var(--hud-spacing-md);
+  background: var(--hud-bg-light);
+  border: 1px solid var(--hud-border-dim);
+  border-radius: var(--hud-radius-sm);
+  color: var(--hud-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--hud-transition);
+}
+
+.source-btn:hover {
+  border-color: var(--hud-border);
+}
+
+.source-btn.active {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: var(--hud-border);
+  color: var(--hud-text-primary);
+}
+
+.upload-section {
+  margin-top: var(--hud-spacing-md);
 }
 
 .permission-request {

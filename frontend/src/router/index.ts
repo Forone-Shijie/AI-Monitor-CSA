@@ -15,6 +15,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '实时监控' }
   },
   {
+    path: '/video-analyze',
+    name: 'VideoAnalyzer',
+    component: () => import('@/views/VideoAnalyzer.vue'),
+    meta: { title: '视频分析' }
+  },
+  {
     path: '/playback',
     name: 'PlaybackAnalysis',
     component: () => import('@/views/PlaybackAnalysis.vue'),

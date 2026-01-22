@@ -11,6 +11,7 @@ from .routes import (
     evaluation_router,
     playback_router,
     sessions_router,
+    uploads_router,
     websocket_router,
 )
 
@@ -22,6 +23,7 @@ api_router.include_router(sessions_router)
 api_router.include_router(evaluation_router)
 api_router.include_router(playback_router)
 api_router.include_router(config_router)
+api_router.include_router(uploads_router)
 api_router.include_router(websocket_router)
 
 

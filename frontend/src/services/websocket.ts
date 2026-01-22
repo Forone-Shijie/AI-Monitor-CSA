@@ -287,12 +287,13 @@ export class StreamingWebSocketClient {
 
       this.sessionId = sessionId
       const url = `${WS_BASE_URL}/api/ws/stream/${sessionId}`
+      console.log(`[StreamingWS] Connecting to: ${url}`)
 
       try {
         this.ws = new WebSocket(url)
 
         this.ws.onopen = () => {
-          console.log(`Streaming WebSocket connected to session: ${sessionId}`)
+          console.log(`[StreamingWS] Connected to session: ${sessionId}`)
           this.reconnectAttempts = 0
           this.onConnectHandlers.forEach(handler => handler())
           resolve()
@@ -301,22 +302,26 @@ export class StreamingWebSocketClient {
         this.ws.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data)
-            if (message.type === 'frame_result') {
+            if (message.type === 'connected') {
+              console.log('[StreamingWS] Server confirmed connection:', message.data)
+            } else if (message.type === 'frame_result') {
               this.onResultHandlers.forEach(handler => handler(message.data))
+            } else if (message.type === 'error') {
+              console.error('[StreamingWS] Server error:', message.data)
             }
           } catch (error) {
-            console.error('Failed to parse streaming message:', error)
+            console.error('[StreamingWS] Failed to parse message:', error)
           }
         }
 
         this.ws.onerror = (error) => {
-          console.error('Streaming WebSocket error:', error)
+          console.error('[StreamingWS] WebSocket error:', error)
           this.onErrorHandlers.forEach(handler => handler(error))
           reject(error)
         }
 
-        this.ws.onclose = () => {
-          console.log('Streaming WebSocket disconnected')
+        this.ws.onclose = (event) => {
+          console.log(`[StreamingWS] Disconnected, code: ${event.code}, reason: ${event.reason}`)
           this.onDisconnectHandlers.forEach(handler => handler())
           this.attemptReconnect()
         }

@@ -7,12 +7,14 @@ Provides routers for:
 - Evaluation: Scoring and reports
 - Playback: Session playback
 - Config: System configuration
+- Uploads: Video file upload and management
 """
 
 from .config import router as config_router
 from .evaluation import router as evaluation_router
 from .playback import router as playback_router
 from .sessions import router as sessions_router
+from .uploads import router as uploads_router
 from .websocket import router as websocket_router
 
 __all__ = [
@@ -21,4 +23,5 @@ __all__ = [
     "evaluation_router",
     "playback_router",
     "config_router",
+    "uploads_router",
 ]

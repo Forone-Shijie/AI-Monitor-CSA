@@ -262,6 +262,9 @@ echo -e "${YELLOW}[8/9] 锁定关键版本并编译 xtcocotools...${NC}"
 pip install opencv-python==4.8.1.78 --force-reinstall --quiet
 pip install numpy==1.24.4 --force-reinstall --quiet
 
+# 锁定 setuptools 版本 (新版 setuptools>=70 的 pkg_resources 与 mmengine 不兼容)
+pip install "setuptools==69.5.1" --force-reinstall --quiet
+
 # 编译 xtcocotools (需要 numpy 1.x)
 pip install cython --quiet
 pip install xtcocotools --no-cache-dir --no-binary xtcocotools --no-build-isolation --force-reinstall --quiet 2>/dev/null || {

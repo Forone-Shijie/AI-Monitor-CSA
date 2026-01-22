@@ -23,7 +23,11 @@ import type {
   EvaluationWeights,
   HealthCheck,
   ASRMode,
-  DeviceInfo
+  DeviceInfo,
+  VideoInfo,
+  VideoUploadResponse,
+  VideoListResponse,
+  VideoDeleteResponse
 } from '@/types/api'
 
 // API Base URL
@@ -267,5 +271,69 @@ export async function getAudioDevices(): Promise<DeviceInfo[]> {
   return response.data.data ?? []
 }
 
+// =============================================================================
+// Video Upload API
+// =============================================================================
+
+/**
+ * Upload a video file for analysis.
+ * @param file - Video file to upload
+ * @param onProgress - Optional progress callback (0-100)
+ */
+export async function uploadVideo(
+  file: File,
+  onProgress?: (progress: number) => void
+): Promise<VideoUploadResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await apiClient.post<VideoUploadResponse>(
+    '/api/uploads/videos',
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 300000, // 5 minutes for large files
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          onProgress(progress)
+        }
+      }
+    }
+  )
+  return response.data
+}
+
+/**
+ * List all uploaded videos.
+ */
+export async function listVideos(): Promise<VideoListResponse> {
+  const response = await apiClient.get<VideoListResponse>('/api/uploads/videos')
+  return response.data
+}
+
+/**
+ * Get video information by ID.
+ */
+export async function getVideo(videoId: string): Promise<VideoInfo> {
+  const response = await apiClient.get<VideoUploadResponse>(`/api/uploads/videos/${videoId}`)
+  return response.data.data
+}
+
+/**
+ * Delete an uploaded video.
+ */
+export async function deleteVideo(videoId: string): Promise<VideoDeleteResponse> {
+  const response = await apiClient.delete<VideoDeleteResponse>(`/api/uploads/videos/${videoId}`)
+  return response.data
+}
+
+/**
+ * Get video stream URL for playback.
+ */
+export function getVideoStreamUrl(videoId: string): string {
+  return `${API_BASE_URL}/api/uploads/videos/${videoId}/stream`
+}
+
 // Export client for custom requests
-export { apiClient }
+export { apiClient, API_BASE_URL }

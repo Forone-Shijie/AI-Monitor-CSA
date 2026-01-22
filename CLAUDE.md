@@ -6,7 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CC-SOP Monitor (客舱乘务员姿态与操作规范监测系统) - An AI training evaluation system for China Southern Airlines cabin crew. The system monitors crew performance in training simulators through computer vision, action recognition, and speech analysis.
 
-**Current Status**: Project initialization phase (Phase 0). Documentation and architecture are defined; implementation is pending.
+**Current Status**: Core features implemented (Phase 5). Real-time monitoring, video analysis, and multi-person pose detection are functional.
+
+### Implemented Features
+
+- **Real-time Monitoring**: Camera input with WebSocket streaming + skeleton overlay
+- **Video Analysis**: Video upload + offline analysis with skeleton visualization
+- **Multi-person Pose Detection**: RTMPose-M supporting up to 5 persons simultaneously
+- **Speech Recognition**: Doubao ASR streaming recognition with real-time subtitles
+- **SOP Timeline**: ECharts-based action sequence timeline visualization
 
 ## Technology Stack
 
@@ -23,8 +31,21 @@ CC-SOP Monitor (客舱乘务员姿态与操作规范监测系统) - An AI traini
 
 - **Minimum**: NVIDIA GPU with 4GB+ VRAM (RTX 2060 or higher)
 - **Recommended**: RTX 3090 (24GB) or RTX 4070 Laptop (8GB)
-- **CUDA**: 12.x
+- **CUDA**: 12.x (RTX 50 series requires 12.8+)
 - **Performance**: 30+ FPS for 3-person detection on RTX 4070 Laptop
+
+### GPU Architecture Compatibility
+
+| Architecture | GPU Series | CUDA | Special Handling |
+|--------------|------------|------|------------------|
+| Ampere | RTX 30xx | 12.0+ | Standard install |
+| Ada Lovelace | RTX 40xx | 12.0+ | Standard install |
+| Blackwell | RTX 50xx (5070/5080/5090) | **12.8+** | Run `scripts/fix_cuda_blackwell.sh` |
+
+**RTX 50 Series (Blackwell) requires**:
+- PyTorch nightly with CUDA 12.8
+- mmcv compiled from source with `TORCH_CUDA_ARCH_LIST="8.0;8.6;9.0;12.0"`
+- GCC < 14.0 for compilation
 
 ## Development Commands
 
@@ -77,6 +98,18 @@ docker-compose logs -f
 bash scripts/download_models.sh
 ```
 
+### RTX 50 Series (Blackwell) Setup
+```bash
+# For RTX 5070/5080/5090 users
+bash scripts/fix_cuda_blackwell.sh
+
+# This script will:
+# 1. Install PyTorch nightly with CUDA 12.8
+# 2. Install CUDA toolkit 12.8 via conda
+# 3. Install MMPose dependencies
+# 4. Compile mmcv from source with sm_120 support
+```
+
 ## Architecture
 
 The system follows a layered pipeline architecture:
@@ -111,6 +144,16 @@ All perception modules use abstract base classes with concrete implementations:
 - `PoseDetector` (base) → `RTMPoseDetector` (GPU, multi-person, COCO 17-point)
 - `ActionRecognizer` (base) → `STGCNRecognizer`
 - `ASREngine` (base) → `DoubaoASR`, `WhisperASR`
+
+### Key API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/ws/monitor/{session_id}` | WebSocket | Real-time pose streaming |
+| `/api/uploads/videos` | POST | Upload video for analysis |
+| `/api/uploads/videos/{id}/stream` | GET | Stream video for playback |
+| `/api/session/start` | POST | Start monitoring session |
+| `/api/report/{session_id}` | GET | Get session report |
 
 ## Configuration
 

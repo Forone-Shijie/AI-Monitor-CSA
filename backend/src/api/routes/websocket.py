@@ -23,7 +23,7 @@ from ..schemas import MonitoringFrame, PoseData, SessionStatus, WSMessage
 from ..session_manager import session_manager
 from ...perception.rtmpose_detector import RTMPoseDetector
 
-# 配置日志
+# Setup logger
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["WebSocket"])
@@ -346,30 +346,34 @@ class FrameProcessor:
     """
     Process video frames from browser using RTMPose (GPU-accelerated).
 
-    Maintains a pose detector instance per session for efficient processing.
+    Uses a singleton RTMPose detector shared across all sessions.
     Uses COCO 17-point keypoint format.
     """
 
     def __init__(self) -> None:
         """Initialize frame processor."""
-        self._detectors: Dict[str, RTMPoseDetector] = {}
+        self._detector: Optional[RTMPoseDetector] = None  # 单例模式
         self._frame_counts: Dict[str, int] = {}
         self._lock = asyncio.Lock()
         # ThreadPoolExecutor for async inference (avoid blocking event loop)
-        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="rtmpose")
+        # 增加线程数以提高并行处理能力，减少帧积压
+        self._executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="rtmpose")
 
-    async def get_detector(self, session_id: str) -> RTMPoseDetector:
-        """Get or create pose detector for session."""
+    async def get_detector(self) -> RTMPoseDetector:
+        """Get shared pose detector (singleton pattern).
+
+        Using singleton avoids mmengine/pkg_resources initialization issues
+        that occur with repeated detector creation.
+        """
         async with self._lock:
-            if session_id not in self._detectors:
-                self._detectors[session_id] = RTMPoseDetector(
+            if self._detector is None:
+                self._detector = RTMPoseDetector(
                     device="cuda:0",
                     det_score_thr=0.3,
                     pose_score_thr=0.3,
                     max_persons=5,
                 )
-                self._frame_counts[session_id] = 0
-            return self._detectors[session_id]
+            return self._detector
 
     async def process_frame(
         self,
@@ -387,17 +391,21 @@ class FrameProcessor:
             Detection results as dict with multi-person poses, or None if processing failed
         """
         try:
+            start_time = time.time()  # 记录处理开始时间
+
             # Decode JPEG to numpy array
             image = Image.open(io.BytesIO(frame_data))
             frame = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-            logger.debug(f"Session {session_id}: received {len(frame_data)} bytes, decoded to {frame.shape}")
+            logger.info(f"[Frame] Session {session_id}: received {len(frame_data)} bytes, decoded to {frame.shape}")
 
-            # Get detector for this session
-            detector = await self.get_detector(session_id)
-            logger.debug(f"RTMPose detector initialized: {detector.is_initialized}")
+            # Get shared detector (singleton)
+            detector = await self.get_detector()
+            logger.info(f"[RTMPose] Detector initialized: {detector.is_initialized}")
 
-            # Increment frame count
+            # Increment frame count for this session
             async with self._lock:
+                if session_id not in self._frame_counts:
+                    self._frame_counts[session_id] = 0
                 self._frame_counts[session_id] += 1
                 frame_number = self._frame_counts[session_id]
 
@@ -408,7 +416,7 @@ class FrameProcessor:
                 detector.detect_multi,
                 frame
             )
-            logger.debug(f"Frame #{frame_number}: detected {multi_result.num_persons} person(s)")
+            logger.info(f"[Pose] Frame #{frame_number}: detected {multi_result.num_persons} person(s)")
 
             # Convert multi-person results to API format
             poses_list: List[Dict[str, Any]] = []
@@ -435,7 +443,7 @@ class FrameProcessor:
                         "confidence": result.confidence,
                     }
                     poses_list.append(pose_data)
-                    logger.debug(f"Person {i}: confidence={result.confidence:.3f}, pose_type={result.pose_type.value}")
+                    logger.debug(f"[Pose] Person {i}: confidence={result.confidence:.3f}, pose_type={result.pose_type.value}")
 
             # Multi-person poses data structure
             poses_data = {
@@ -455,12 +463,15 @@ class FrameProcessor:
                     "confidence": 0.0,
                 }
 
+            processing_time = time.time() - start_time  # 计算处理时间
+
             return {
                 "session_id": session_id,
                 "frame_number": frame_number,
                 "timestamp": time.time(),
                 "poses": poses_data,  # Multi-person data
                 "pose": primary_pose,  # Backward compatible single-person
+                "processing_time": processing_time,  # 用于前端自适应 FPS
             }
 
         except Exception as e:
@@ -468,20 +479,18 @@ class FrameProcessor:
             return None
 
     async def cleanup_session(self, session_id: str) -> None:
-        """Release resources for a session."""
+        """Clean up session-specific resources (frame count only)."""
         async with self._lock:
-            if session_id in self._detectors:
-                self._detectors[session_id].release()
-                del self._detectors[session_id]
             if session_id in self._frame_counts:
                 del self._frame_counts[session_id]
+        # Note: detector is singleton, not cleaned per session
 
     async def cleanup_all(self) -> None:
-        """Release all detector resources."""
+        """Release all resources including shared detector."""
         async with self._lock:
-            for detector in self._detectors.values():
-                detector.release()
-            self._detectors.clear()
+            if self._detector is not None:
+                self._detector.release()
+                self._detector = None
             self._frame_counts.clear()
         # Shutdown thread pool
         self._executor.shutdown(wait=False)
@@ -521,14 +530,18 @@ async def websocket_stream(websocket: WebSocket, session_id: str):
         }
     }
     """
+    logger.info(f"[WS] Stream connection request: session_id={session_id}")
+
     # Check if session exists
     session = session_manager.get_session(session_id)
     if not session:
+        logger.warning(f"[WS] Session not found: {session_id}, rejecting connection")
         await websocket.close(code=4004, reason="Session not found")
         return
 
     # Accept connection
     await websocket.accept()
+    logger.info(f"[WS] Stream connected: session_id={session_id}")
 
     # Send connection confirmation
     await websocket.send_json({
@@ -599,9 +612,10 @@ async def websocket_stream(websocket: WebSocket, session_id: str):
                     })
 
     except WebSocketDisconnect:
-        pass
+        logger.info(f"[WS] Stream disconnected: session_id={session_id}")
     finally:
         # Cleanup detector for this session
+        logger.info(f"[WS] Stream cleanup: session_id={session_id}")
         await frame_processor.cleanup_session(session_id)
 
 
@@ -629,9 +643,9 @@ class AudioProcessor:
 
         # 检查配置
         if self._config.validate():
-            logger.info("DoubaoASR configured (bigmodel_async mode)")
+            logger.info("[ASR] DoubaoASR configured (bigmodel_async mode)")
         else:
-            logger.warning("DoubaoASR config incomplete, check DOUBAO_APP_ID and DOUBAO_ACCESS_TOKEN")
+            logger.warning("[ASR] DoubaoASR config incomplete, check DOUBAO_APP_ID and DOUBAO_ACCESS_TOKEN")
 
     async def start_session(
         self,
@@ -655,17 +669,17 @@ class AudioProcessor:
                 return True
 
             if not self._config.validate():
-                logger.error("Cannot create ASR session: config invalid")
+                logger.warning(f"[ASR] Cannot create session: config invalid")
                 return False
 
             session = DoubaoStreamingSession(self._config, on_result=on_result)
             if await session.start():
                 self._sessions[session_id] = session
                 self._result_callbacks[session_id] = on_result
-                logger.info(f"Started ASR streaming session for {session_id}")
+                logger.info(f"[ASR] Started streaming session for {session_id}")
                 return True
             else:
-                logger.error(f"Failed to start ASR streaming session for {session_id}")
+                logger.error(f"[ASR] Failed to start streaming session for {session_id}")
                 return False
 
     async def send_audio(
@@ -698,7 +712,7 @@ class AudioProcessor:
             await session.send_audio(audio_data, is_last=is_last)
             return True
         except Exception as e:
-            logger.error(f"Error sending audio to ASR: {e}", exc_info=True)
+            logger.error(f"[ASR] Error sending audio: {e}")
             return False
 
     def get_current_text(self, session_id: str) -> str:
@@ -725,7 +739,7 @@ class AudioProcessor:
             final_text = session.get_current_text()
             return {"text": final_text, "is_final": True} if final_text else None
         except Exception as e:
-            logger.error(f"Error finalizing ASR session: {e}", exc_info=True)
+            logger.error(f"[ASR] Error finalizing session: {e}")
             return None
 
     async def cleanup_session(self, session_id: str) -> Optional[str]:
@@ -736,7 +750,7 @@ class AudioProcessor:
 
         if session:
             final_text = await session.stop()
-            logger.info(f"Cleaned up ASR session {session_id}")
+            logger.info(f"[ASR] Cleaned up session {session_id}")
             return final_text
         return None
 

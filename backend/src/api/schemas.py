@@ -476,3 +476,58 @@ class WSSubscribeRequest(BaseModel):
 
     session_id: str
     data_types: List[str] = ["pose", "action", "asr", "brace"]
+
+
+# =============================================================================
+# Video Upload Schemas
+# =============================================================================
+
+
+class VideoInfoData(BaseModel):
+    """Uploaded video information."""
+
+    video_id: str = Field(..., description="Unique video identifier")
+    original_filename: str = Field(..., description="Original uploaded filename")
+    file_path: str = Field(..., description="Server file path")
+    file_size: int = Field(..., description="File size in bytes")
+    duration: Optional[float] = Field(None, description="Video duration in seconds")
+    width: Optional[int] = Field(None, description="Video width in pixels")
+    height: Optional[int] = Field(None, description="Video height in pixels")
+    fps: Optional[float] = Field(None, description="Frames per second")
+    format: str = Field(..., description="Video format (mp4, avi, etc.)")
+    uploaded_at: datetime = Field(..., description="Upload timestamp")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "video_id": "vid_20231223_abc12345",
+                "original_filename": "training_video.mp4",
+                "file_path": "uploads/videos/vid_20231223_abc12345.mp4",
+                "file_size": 52428800,
+                "duration": 120.5,
+                "width": 1920,
+                "height": 1080,
+                "fps": 30.0,
+                "format": "mp4",
+                "uploaded_at": "2023-12-23T10:00:00",
+            }
+        }
+
+
+class VideoUploadResponse(BaseResponse):
+    """Response after successful video upload."""
+
+    data: VideoInfoData
+
+
+class VideoListResponse(BaseResponse):
+    """Response with video list."""
+
+    data: List[VideoInfoData]
+    total: int = 0
+
+
+class VideoDeleteResponse(BaseResponse):
+    """Response after video deletion."""
+
+    deleted_id: str

@@ -430,3 +430,39 @@ export interface HealthCheck {
   sessions: number
   active_session?: string
 }
+
+// =============================================================================
+// Video Upload Types
+// =============================================================================
+
+export interface VideoInfo {
+  video_id: string
+  original_filename: string
+  file_path: string
+  file_size: number
+  duration?: number
+  width?: number
+  height?: number
+  fps?: number
+  format: string
+  uploaded_at: string
+}
+
+export interface VideoUploadResponse {
+  success: boolean
+  message: string
+  data: VideoInfo
+}
+
+export interface VideoListResponse {
+  success: boolean
+  message: string
+  data: VideoInfo[]
+  total: number
+}
+
+export interface VideoDeleteResponse {
+  success: boolean
+  message: string
+  deleted_id: string
+}

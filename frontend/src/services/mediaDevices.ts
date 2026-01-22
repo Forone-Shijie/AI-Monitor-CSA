@@ -155,11 +155,16 @@ export async function checkPermissionStatus(): Promise<{
 
 /**
  * Capture a single frame from video stream as Blob
+ * @param videoElement - The video element to capture from
+ * @param format - Output format ('image/jpeg' or 'image/png')
+ * @param quality - JPEG quality (0-1)
+ * @param maxWidth - Maximum width for scaling (0 = no scaling, keeps original resolution)
  */
 export function captureVideoFrame(
   videoElement: HTMLVideoElement,
   format: 'image/jpeg' | 'image/png' = 'image/jpeg',
-  quality: number = 0.8
+  quality: number = 0.8,
+  maxWidth: number = 0
 ): Promise<Blob | null> {
   return new Promise((resolve) => {
     // Check if video dimensions are valid
@@ -168,9 +173,20 @@ export function captureVideoFrame(
       return
     }
 
+    // Calculate target dimensions with optional scaling
+    let targetWidth = videoElement.videoWidth
+    let targetHeight = videoElement.videoHeight
+
+    // If maxWidth is specified and video is larger, scale down proportionally
+    if (maxWidth > 0 && videoElement.videoWidth > maxWidth) {
+      const scale = maxWidth / videoElement.videoWidth
+      targetWidth = maxWidth
+      targetHeight = Math.round(videoElement.videoHeight * scale)
+    }
+
     const canvas = document.createElement('canvas')
-    canvas.width = videoElement.videoWidth
-    canvas.height = videoElement.videoHeight
+    canvas.width = targetWidth
+    canvas.height = targetHeight
 
     const ctx = canvas.getContext('2d')
     if (!ctx) {
@@ -178,7 +194,10 @@ export function captureVideoFrame(
       return
     }
 
-    ctx.drawImage(videoElement, 0, 0)
+    // Use high-quality scaling for better visual results
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(videoElement, 0, 0, targetWidth, targetHeight)
 
     canvas.toBlob(
       (blob) => resolve(blob),
