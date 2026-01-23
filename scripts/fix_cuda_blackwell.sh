@@ -182,11 +182,31 @@ fi
 echo -e "${GREEN}  ✓ mmcv 编译完成${NC}"
 
 echo ""
-echo -e "${YELLOW}[6/6] 锁定关键版本...${NC}"
-# NumPy 可能在编译过程中被升级，需要重新锁定
-pip install numpy==1.24.4 --force-reinstall --quiet
-pip install opencv-python==4.8.1.78 --force-reinstall --quiet
+echo -e "${YELLOW}[6/6] 强制锁定关键版本...${NC}"
+
+# 卸载当前的 numpy 和 opencv
+pip uninstall -y numpy opencv-python opencv-python-headless 2>/dev/null || true
+
+# 强制安装 NumPy 1.x (使用 --no-deps 防止被其他包覆盖)
+pip install "numpy==1.24.4" --force-reinstall --no-deps
+NUMPY_VER=$(python -c "import numpy; print(numpy.__version__)" 2>/dev/null)
+if [[ "$NUMPY_VER" != "1.24.4" ]]; then
+    echo -e "${RED}  NumPy 版本不正确: $NUMPY_VER，重试...${NC}"
+    pip uninstall -y numpy
+    pip install "numpy==1.24.4" --no-deps --ignore-installed
+fi
+echo -e "${GREEN}  ✓ NumPy $(python -c 'import numpy; print(numpy.__version__)')${NC}"
+
+# 安装与 NumPy 1.x 兼容的 OpenCV
+pip install "opencv-python==4.8.1.78" --force-reinstall --no-deps
+echo -e "${GREEN}  ✓ OpenCV $(python -c 'import cv2; print(cv2.__version__)')${NC}"
+
+# 锁定 setuptools
 pip install "setuptools==69.5.1" --force-reinstall --quiet
+
+# 安装缺失的 mmpose 依赖
+pip install chumpy --quiet 2>/dev/null || true
+
 echo -e "${GREEN}  ✓ 关键版本已锁定${NC}"
 
 echo ""
