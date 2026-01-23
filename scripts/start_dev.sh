@@ -21,7 +21,15 @@ FRONTEND_DIR="$PROJECT_ROOT/frontend"
 
 # Conda 环境
 CONDA_ENV="cc-sop"
-PYTHON="/home/sjzhang/miniconda3/envs/$CONDA_ENV/bin/python"
+# 动态检测 Python 路径
+if [ -n "$CONDA_PREFIX" ]; then
+    PYTHON="$CONDA_PREFIX/bin/python"
+elif command -v python &> /dev/null; then
+    PYTHON="python"
+else
+    echo "错误: 未找到 Python，请先激活 conda 环境: conda activate $CONDA_ENV"
+    exit 1
+fi
 
 # PID 文件
 BACKEND_PID_FILE="/tmp/cc-sop-backend.pid"
