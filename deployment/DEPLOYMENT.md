@@ -233,11 +233,16 @@ conda install -y -c conda-forge \
 **关键**: 设置环境变量让编译器找到 CUDA 头文件：
 
 ```bash
+# 查找 CUDA 头文件位置 (conda-forge 可能放在不同目录)
+CUDA_INCLUDE_DIR=$(find $CONDA_PREFIX -name "cuda_runtime_api.h" -printf '%h\n' 2>/dev/null | head -1)
+echo "CUDA 头文件目录: $CUDA_INCLUDE_DIR"
+
+# 设置环境变量
 export CUDA_HOME=$CONDA_PREFIX
 export PATH=$CONDA_PREFIX/bin:$PATH
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
-export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/include:$CPLUS_INCLUDE_PATH
-export C_INCLUDE_PATH=$CONDA_PREFIX/include:$C_INCLUDE_PATH
+export CPLUS_INCLUDE_PATH=$CUDA_INCLUDE_DIR:$CPLUS_INCLUDE_PATH
+export C_INCLUDE_PATH=$CUDA_INCLUDE_DIR:$C_INCLUDE_PATH
 export LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
 ```
 
@@ -425,18 +430,17 @@ EOF
 
 ### Q1: `cuda_runtime_api.h: No such file or directory`
 
-**原因**: conda 安装的 CUDA toolkit 头文件路径未添加到编译器搜索路径
+**原因**: conda-forge 的 CUDA toolkit 头文件可能放在不同的目录（如 `targets/x86_64-linux/include/`）
 
 **解决方案**:
 ```bash
-# 检查头文件是否存在
-ls $CONDA_PREFIX/include/cuda_runtime_api.h
+# 查找头文件实际位置
+find $CONDA_PREFIX -name "cuda_runtime_api.h"
 
-# 设置环境变量
-export CUDA_HOME=$CONDA_PREFIX
-export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/include:$CPLUS_INCLUDE_PATH
-export C_INCLUDE_PATH=$CONDA_PREFIX/include:$C_INCLUDE_PATH
-export LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
+# 设置环境变量 (将 <path> 替换为实际路径)
+CUDA_INCLUDE_DIR=$(find $CONDA_PREFIX -name "cuda_runtime_api.h" -printf '%h\n' | head -1)
+export CPLUS_INCLUDE_PATH=$CUDA_INCLUDE_DIR:$CPLUS_INCLUDE_PATH
+export C_INCLUDE_PATH=$CUDA_INCLUDE_DIR:$C_INCLUDE_PATH
 
 # 然后重新编译 mmcv
 ```

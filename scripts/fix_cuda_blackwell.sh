@@ -81,9 +81,51 @@ conda install -y -c conda-forge cuda-nvcc cuda-cudart-dev cuda-libraries-dev nin
 export CUDA_HOME=$CONDA_PREFIX
 export PATH=$CONDA_PREFIX/bin:$PATH
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
-export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/include:$CPLUS_INCLUDE_PATH
-export C_INCLUDE_PATH=$CONDA_PREFIX/include:$C_INCLUDE_PATH
-export LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
+
+# 查找 CUDA 头文件的实际位置 (conda-forge 可能放在不同目录)
+CUDA_INCLUDE_DIR=""
+for dir in \
+    "$CONDA_PREFIX/include" \
+    "$CONDA_PREFIX/targets/x86_64-linux/include" \
+    "$CONDA_PREFIX/lib/python3.10/site-packages/nvidia/cuda_runtime/include"; do
+    if [ -f "$dir/cuda_runtime_api.h" ]; then
+        CUDA_INCLUDE_DIR="$dir"
+        break
+    fi
+done
+
+if [ -z "$CUDA_INCLUDE_DIR" ]; then
+    # 使用 find 作为后备方案
+    CUDA_INCLUDE_DIR=$(find $CONDA_PREFIX -name "cuda_runtime_api.h" -printf '%h\n' 2>/dev/null | head -1)
+fi
+
+if [ -n "$CUDA_INCLUDE_DIR" ]; then
+    echo -e "${GREEN}  ✓ CUDA 头文件目录: $CUDA_INCLUDE_DIR${NC}"
+    export CPLUS_INCLUDE_PATH=$CUDA_INCLUDE_DIR:$CPLUS_INCLUDE_PATH
+    export C_INCLUDE_PATH=$CUDA_INCLUDE_DIR:$C_INCLUDE_PATH
+else
+    echo -e "${RED}  ✗ cuda_runtime_api.h 未找到${NC}"
+    echo -e "${YELLOW}  尝试搜索头文件...${NC}"
+    find $CONDA_PREFIX -name "cuda*.h" 2>/dev/null | head -10
+    exit 1
+fi
+
+# 查找 CUDA 库文件目录
+CUDA_LIB_DIR=""
+for dir in \
+    "$CONDA_PREFIX/lib" \
+    "$CONDA_PREFIX/targets/x86_64-linux/lib" \
+    "$CONDA_PREFIX/lib64"; do
+    if [ -f "$dir/libcudart.so" ] || [ -d "$dir" ]; then
+        CUDA_LIB_DIR="$dir"
+        break
+    fi
+done
+
+if [ -n "$CUDA_LIB_DIR" ]; then
+    export LIBRARY_PATH=$CUDA_LIB_DIR:$LIBRARY_PATH
+    export LD_LIBRARY_PATH=$CUDA_LIB_DIR:$LD_LIBRARY_PATH
+fi
 
 # 验证 nvcc
 if command -v nvcc &> /dev/null; then
@@ -91,14 +133,6 @@ if command -v nvcc &> /dev/null; then
     echo -e "${GREEN}  ✓ nvcc ${NVCC_VERSION}${NC}"
 else
     echo -e "${RED}  ✗ nvcc 未找到${NC}"
-    exit 1
-fi
-
-# 验证 CUDA 头文件
-if [ -f "$CONDA_PREFIX/include/cuda_runtime_api.h" ]; then
-    echo -e "${GREEN}  ✓ CUDA 头文件已就绪${NC}"
-else
-    echo -e "${RED}  ✗ cuda_runtime_api.h 未找到${NC}"
     exit 1
 fi
 
@@ -131,11 +165,9 @@ export MMCV_WITH_OPS=1
 export FORCE_CUDA=1
 export TORCH_CUDA_ARCH_LIST="8.0;8.6;9.0;12.0"
 
-# 关键: 确保 CUDA 头文件路径正确
+# 关键: 确保 CUDA 头文件路径正确 (使用之前检测到的路径)
 export CUDA_HOME=$CONDA_PREFIX
-export CPLUS_INCLUDE_PATH=$CONDA_PREFIX/include:$CPLUS_INCLUDE_PATH
-export C_INCLUDE_PATH=$CONDA_PREFIX/include:$C_INCLUDE_PATH
-export LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
+# CUDA_INCLUDE_DIR 和 CUDA_LIB_DIR 在上面已设置
 
 pip uninstall -y mmcv 2>/dev/null || true
 
